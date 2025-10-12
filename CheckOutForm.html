@@ -2,6 +2,9 @@
 <html>
 <head>
     <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <?!= include('SharedStyles'); ?>
+    <?!= include('AppShellStyles'); ?>
     <style>
         main { max-width: 800px; margin: 2rem auto; }
         #epjInfoDisplay {
@@ -13,12 +16,12 @@
     </style>
 </head>
 <body>
+    <div id="topRightControls" class="top-controls">
+        <button class="outline" onclick="loadProfilePage()">My Profile</button>
+        <button class="contrast" onclick="logout()">Logout</button>
+    </div>
     <main class="container">
         <article>
-            <div style="position: absolute; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.75rem; z-index: 10;">
-                <button class="outline" onclick="loadProfilePage()">My Profile</button>
-                <button class="contrast" onclick="logout()">Logout</button>
-            </div>
             
             <h2>Driver Check-Out</h2>
             <p>Welcome, <b><?!= username; ?></b>. Please confirm your details to check out an EPJ.</p>
@@ -56,7 +59,14 @@
             </form>
         </article>
     </main>
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
+
+    <?!= include('AppShellScript'); ?>
     <script>
+        const app = AppShell.init();
         const epjInfoMap = <?!= JSON.stringify(epjInfoMap) ?>;
         const availableEpjs = <?!= availableEpjs; ?>;
 
@@ -115,15 +125,23 @@
                 epjNumber: document.getElementById('epjNumber').value,
                 faultReport: document.getElementById('faultReport').value
             };
-            if (!formData.epjNumber) { alert('Please select an EPJ.'); return; }
+            if (!formData.epjNumber) { app.toast('Please select an EPJ.', { variant: 'error' }); return; }
             document.getElementById("feedback").innerText = "Processing Check-Out...";
-            google.script.run.withSuccessHandler(onSuccess).processCheckOut(formData);
+            app.showLoading();
+            google.script.run
+                .withSuccessHandler(onSuccess)
+                .withFailureHandler(err => {
+                    app.toast(err.message || 'Check-Out failed.', { variant: 'error' });
+                    app.hideLoading();
+                })
+                .processCheckOut(formData);
         });
-        
+
         function onSuccess(message) {
-             if (message.startsWith('Error:')) {
+            app.hideLoading();
+            if (message.startsWith('Error:')) {
                 document.getElementById("feedback").innerText = '';
-                alert(message);
+                app.toast(message, { variant: 'error' });
             } else {
                 document.getElementById('content').innerHTML = `
                     <main class="container" style="max-width: 800px; margin: 2rem auto;">
@@ -133,6 +151,7 @@
                             <p>Returning to login screen...</p>
                         </article>
                     </main>`;
+                app.toast('Check-Out complete.');
                 setTimeout(logout, 2000);
             }
         }

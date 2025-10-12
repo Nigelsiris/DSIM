@@ -1,0 +1,169 @@
+<style>
+:root {
+  --dsim-toast-bg: #222;
+  --dsim-toast-error-bg: #c0392b;
+}
+
+.top-controls {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  z-index: 1000;
+}
+
+.top-controls .theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.theme-toggle {
+  padding: 0.5rem 0.9rem;
+  border-radius: 1.25rem;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] {
+  background-color: #1a1a1a;
+  color: #ffffff;
+}
+
+[data-theme="dark"] article {
+  background-color: #2d2d2d;
+  border-color: #404040;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] button,
+[data-theme="dark"] textarea {
+  background-color: #333;
+  border-color: #404040;
+  color: #fff;
+}
+
+[data-theme="dark"] table {
+  background-color: #2d2d2d;
+  color: #fff;
+}
+
+[data-theme="dark"] th,
+[data-theme="dark"] td {
+  border-color: #404040;
+}
+
+[data-theme="dark"] .theme-toggle {
+  background: #2d2d2d;
+  border-color: #404040;
+  color: #fff;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.loading-overlay.is-active {
+  display: flex;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #1095c1;
+  border-radius: 50%;
+  animation: dsim-spin 1s linear infinite;
+}
+
+@keyframes dsim-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--dsim-toast-bg);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  border-radius: 1.5rem;
+  z-index: 3000;
+  font-size: 1rem;
+  min-width: 160px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast[data-variant="error"] {
+  background: var(--dsim-toast-error-bg);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2500;
+  padding: 1rem;
+}
+
+.modal-overlay.is-visible {
+  display: flex;
+}
+
+.modal-content {
+  background: #fff;
+  color: #222;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  width: min(500px, 100%);
+}
+
+[data-theme="dark"] .modal-content {
+  background: #2d2d2d;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .top-controls {
+    position: static;
+    margin: 0 0 1rem;
+    justify-content: flex-end;
+  }
+}
+</style>

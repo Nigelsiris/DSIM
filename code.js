@@ -30,6 +30,11 @@ const MAINT_LOG_SHEET_NAME = 'Maintenance_Log';
 const ZONES_SHEET_NAME = 'Zones';
 const LOGIN_LOG_SHEET_NAME = 'Login_Log';
 
+// Allow HtmlService templates to inline partial HTML files (styles/scripts).
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 // --- PASTE YOUR WAREHOUSE COORDINATES HERE ---
 const WAREHOUSE_LAT = 39.58390517747175;
 const WAREHOUSE_LON = -76.02613486224995;

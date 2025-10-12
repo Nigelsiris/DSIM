@@ -2,9 +2,15 @@
 <html>
 <head>
     <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <?!= include('SharedStyles'); ?>
+    <?!= include('AppShellStyles'); ?>
     <style> main { max-width: 600px; margin: 2rem auto; } </style>
 </head>
 <body>
+    <div id="topRightControls" class="top-controls">
+        <button class="contrast" onclick="logout()">Logout</button>
+    </div>
     <main class="container">
         <article>
             <h2>My Profile</h2>
@@ -22,11 +28,18 @@
             <button id="changePasswordButton">Change Password</button>
             <p id="feedback" style="text-align:center; min-height:20px;"></p>
         </article>
-        
+
         <button class="secondary outline" onclick="(function() { const token = localStorage.getItem('sessionToken'); google.script.run.withSuccessHandler(loadView).getUserView(token); })()" style="margin-top: 1rem;">Back to Main Screen</button>
 
     </main>
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
+
+    <?!= include('AppShellScript'); ?>
     <script>
+        const app = AppShell.init();
         document.getElementById('changePasswordButton').addEventListener('click', () => {
             const currentPass = document.getElementById('currentPassword').value;
             const newPass = document.getElementById('newPassword').value;
@@ -35,15 +48,18 @@
 
             if (!currentPass || !newPass || !confirmPass) {
                 feedback.innerText = 'All fields are required.';
+                app.toast('All fields are required.', { variant: 'error' });
                 return;
             }
             if (newPass !== confirmPass) {
                 feedback.innerText = 'New passwords do not match.';
+                app.toast('New passwords do not match.', { variant: 'error' });
                 return;
             }
 
             feedback.innerText = 'Updating password...';
             const token = localStorage.getItem('sessionToken');
+            app.showLoading();
             google.script.run
                 .withSuccessHandler(message => {
                     feedback.innerText = message;
@@ -52,7 +68,14 @@
                         document.getElementById('currentPassword').value = '';
                         document.getElementById('newPassword').value = '';
                         document.getElementById('confirmPassword').value = '';
+                        app.toast(message);
                     }
+                    app.hideLoading();
+                })
+                .withFailureHandler(err => {
+                    feedback.innerText = err.message || 'Unable to update password.';
+                    app.toast('Unable to update password.', { variant: 'error' });
+                    app.hideLoading();
                 })
                 .driverChangePassword({
                     token: token,
