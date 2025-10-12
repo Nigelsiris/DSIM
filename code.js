@@ -11,16 +11,10 @@ function getUserManagementPage(token) {
 function getAllUsers(data) {
   const session = getSession(data.token);
   if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
-  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-  let users = [];
-  if (userSheet) {
-    const lastRow = userSheet.getLastRow();
-    if (lastRow > 1) {
-      const usersData = userSheet.getRange(2, 1, lastRow - 1, 4).getValues();
-      users = usersData.map(row => ({ username: row[0], role: row[2], carrier: row[3] || '' })).filter(u => u.username);
-    }
-  }
-  return users;
+  const directory = getUserDirectory();
+  return directory.list
+    .map(record => ({ username: record.username, role: record.role, carrier: record.carrier }))
+    .filter(user => user.username);
 }
 // --- CONFIGURATION ---
 const LOG_SHEET_NAME = 'Form Responses 1';
@@ -29,6 +23,66 @@ const USER_SHEET_NAME = 'Users';
 const MAINT_LOG_SHEET_NAME = 'Maintenance_Log';
 const ZONES_SHEET_NAME = 'Zones';
 const LOGIN_LOG_SHEET_NAME = 'Login_Log';
+
+const CACHE_KEYS = Object.freeze({
+  ACTIVE_TRIPS: 'activeTrips',
+  EPJ_INFO_MAP: 'epjInfoMap',
+  ACTIVE_DRIVERS: 'activeDrivers',
+  ZONE_OPTIONS: 'zoneOptions',
+  EPJ_STATUSES: 'epjStatuses',
+  USER_DIRECTORY: 'user_directory_v1'
+});
+
+let activeSpreadsheet = null;
+
+function getSpreadsheet() {
+  if (!activeSpreadsheet) {
+    activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  }
+  return activeSpreadsheet;
+}
+
+function getSheet(sheetName) {
+  const spreadsheet = getSpreadsheet();
+  return spreadsheet ? spreadsheet.getSheetByName(sheetName) : null;
+}
+
+function getUserDirectory(forceRefresh) {
+  const cache = CacheService.getScriptCache();
+  if (!forceRefresh) {
+    const cached = cache.get(CACHE_KEYS.USER_DIRECTORY);
+    if (cached) return JSON.parse(cached);
+  }
+
+  const directory = { list: [], byUsername: {} };
+  const userSheet = getSheet(USER_SHEET_NAME);
+  if (userSheet) {
+    const lastRow = userSheet.getLastRow();
+    if (lastRow > 1) {
+      const values = userSheet.getRange(2, 1, lastRow - 1, 4).getValues();
+      values.forEach((row, index) => {
+        const username = row[0];
+        if (!username) return;
+        const record = {
+          username: username,
+          passwordHash: row[1],
+          role: row[2],
+          carrier: row[3] || '',
+          rowIndex: index + 2
+        };
+        directory.list.push(record);
+        directory.byUsername[username.toLowerCase()] = record;
+      });
+    }
+  }
+
+  cache.put(CACHE_KEYS.USER_DIRECTORY, JSON.stringify(directory), 600);
+  return directory;
+}
+
+function invalidateUserCaches() {
+  CacheService.getScriptCache().removeAll([CACHE_KEYS.USER_DIRECTORY, 'admin_users']);
+}
 
 // --- PASTE YOUR WAREHOUSE COORDINATES HERE ---
 const WAREHOUSE_LAT = 39.58390517747175;
@@ -46,12 +100,18 @@ function doGet(e) {
 // --- UTILITIES ---
 function clearStateCache() {
   const cache = CacheService.getScriptCache();
-  cache.removeAll(['activeTrips', 'epjInfoMap', 'activeDrivers', 'zoneOptions', 'epjStatuses']);
+  cache.removeAll([
+    CACHE_KEYS.ACTIVE_TRIPS,
+    CACHE_KEYS.EPJ_INFO_MAP,
+    CACHE_KEYS.ACTIVE_DRIVERS,
+    CACHE_KEYS.ZONE_OPTIONS,
+    CACHE_KEYS.EPJ_STATUSES
+  ]);
 }
 
 function updateAllEpjStatuses() {
-  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-  const statusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  const logSheet = getSheet(LOG_SHEET_NAME);
+  const statusSheet = getSheet(STATUS_SHEET_NAME);
   if (!logSheet || !statusSheet) return;
 
   const logData = logSheet.getDataRange().getValues();
@@ -176,18 +236,15 @@ function getEquipmentStatusPageHtml(token) {
 // --- AUTHENTICATION & SESSIONS ---
 function loginAndGetUserView(loginData) {
   const { username, password, latitude, longitude } = loginData;
-  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-  const data = userSheet.getRange("A:D").getValues();
+  const directory = getUserDirectory();
   const passwordHash = sha256(password);
   let user = null;
 
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] && data[i][0].toLowerCase() === username.toLowerCase() && data[i][1] === passwordHash) {
-      user = { username: data[i][0], role: data[i][2] };
-      break;
-    }
+  const userRecord = directory.byUsername[username.toLowerCase()];
+  if (userRecord && userRecord.passwordHash === passwordHash) {
+    user = { username: userRecord.username, role: userRecord.role };
   }
-  const loginLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_LOG_SHEET_NAME);
+  const loginLogSheet = getSheet(LOGIN_LOG_SHEET_NAME);
   if (loginLogSheet) {
     let isAtWarehouse = false;
     if (latitude && longitude) {
@@ -223,7 +280,7 @@ function processCheckOut(data) {
   lock.waitLock(30000); 
   try {
     // Invalidate EPJ status cache before checking availability
-    CacheService.getScriptCache().remove('epjStatuses');
+    CacheService.getScriptCache().remove(CACHE_KEYS.EPJ_STATUSES);
     Logger.log('processCheckOut called with: ' + JSON.stringify(data));
     const session = getSession(data.token);
     Logger.log('Session: ' + JSON.stringify(session));
@@ -240,13 +297,13 @@ function processCheckOut(data) {
     }
     const epjInfoMap = getEpjInfoMap();
     const startingZone = epjInfoMap[data.epjNumber] ? epjInfoMap[data.epjNumber].location : 'Unknown';
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const logSheet = getSheet(LOG_SHEET_NAME);
     const tripId = "TRIP-" + Utilities.getUuid().substring(0, 8).toUpperCase();
     logSheet.appendRow([tripId, new Date(), session.username, data.driverName, data.truckNumber, data.trailerNumber, data.epjNumber, data.route, startingZone, "Check-Out", data.faultReport, "", ""]);
     SpreadsheetApp.flush();
     updateAllEpjStatuses();
     // Invalidate again after status update
-    CacheService.getScriptCache().remove('epjStatuses');
+    CacheService.getScriptCache().remove(CACHE_KEYS.EPJ_STATUSES);
     Logger.log('Check-Out successful for EPJ: ' + data.epjNumber);
     return `Successfully checked out EPJ ${data.epjNumber}.`;
   } finally {
@@ -259,33 +316,36 @@ function processCheckIn(data) {
     if (!session) throw new Error("Invalid session.");
     const activeTrip = findActiveTrip(session.username); 
     if (!activeTrip) return "Error: No active trip found.";
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const logSheet = getSheet(LOG_SHEET_NAME);
     logSheet.appendRow([
         activeTrip.tripId, new Date(), session.username, activeTrip.driver, "", "",
         activeTrip.epj, "", activeTrip.zone, "Check-In", "",
         data.checkInZone, data.faultReport, data.pluggedIn
     ]);
   updateAllEpjStatuses();
-  CacheService.getScriptCache().remove('epjStatuses');
+  CacheService.getScriptCache().remove(CACHE_KEYS.EPJ_STATUSES);
   return `Successfully checked in EPJ ${activeTrip.epj}.`;
 }
 
 function driverChangePassword(data) {
   const session = getSession(data.token);
   if (!session) throw new Error("Invalid session.");
-  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-  const users = userSheet.getDataRange().getValues();
   const currentPasswordHash = sha256(data.currentPassword);
-  for (let i = 1; i < users.length; i++) {
-    if (users[i][0] === session.username) {
-      if (users[i][1] !== currentPasswordHash) {
-        return "Error: Incorrect current password.";
-      }
-      userSheet.getRange(i + 1, 2).setValue(sha256(data.newPassword));
-      return "Password updated successfully!";
-    }
+  const directory = getUserDirectory();
+  const record = directory.byUsername[session.username.toLowerCase()];
+  if (!record) {
+    return "Error: Could not find user profile.";
   }
-  return "Error: Could not find user profile.";
+  if (record.passwordHash !== currentPasswordHash) {
+    return "Error: Incorrect current password.";
+  }
+  const userSheet = getSheet(USER_SHEET_NAME);
+  if (!userSheet) {
+    return "Error: Could not access user directory.";
+  }
+  userSheet.getRange(record.rowIndex, 2).setValue(sha256(data.newPassword));
+  invalidateUserCaches();
+  return "Password updated successfully!";
 }
 
 
@@ -300,33 +360,20 @@ function getDashboardData(data) {
   }
   // Use cache for users and maintenance log
   const cache = CacheService.getScriptCache();
-  let users = [];
-  let userMap = {};
-  let usersCached = cache.get('admin_users');
-  if (usersCached) {
-    users = JSON.parse(usersCached);
-    users.forEach(u => { userMap[u.username] = u; });
-  } else {
-    const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-    if (userSheet) {
-      const lastRow = userSheet.getLastRow();
-      if (lastRow > 1) {
-        const usersData = userSheet.getRange(2, 1, lastRow - 1, 4).getValues();
-        users = usersData.map(row => {
-          const userObject = { username: row[0], role: row[2], carrier: row[3] || '' };
-          userMap[row[0]] = userObject;
-          return userObject;
-        }).filter(u => u.username);
-        cache.put('admin_users', JSON.stringify(users), 600); // cache for 10 min
-      }
-    }
-  }
+  const userDirectory = getUserDirectory();
+  const users = userDirectory.list
+    .map(record => ({ username: record.username, role: record.role, carrier: record.carrier }))
+    .filter(user => user.username);
+  const userMap = {};
+  userDirectory.list.forEach(record => {
+    userMap[record.username.toLowerCase()] = record;
+  });
   let maintenanceLog = [];
   let maintCached = cache.get('admin_maintlog');
   if (maintCached) {
     maintenanceLog = JSON.parse(maintCached);
   } else {
-    const maintSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MAINT_LOG_SHEET_NAME);
+    const maintSheet = getSheet(MAINT_LOG_SHEET_NAME);
     if (maintSheet && maintSheet.getLastRow() > 1) {
       const lastMaintRow = maintSheet.getLastRow();
       const startRow = Math.max(2, lastMaintRow - 19);
@@ -336,7 +383,7 @@ function getDashboardData(data) {
     }
   }
   const activeCheckouts = getActiveCheckouts().map(checkout => {
-    const driverInfo = userMap[checkout.driverUsername];
+    const driverInfo = userMap[(checkout.driverUsername || '').toLowerCase()];
     checkout.carrier = driverInfo ? driverInfo.carrier : 'N/A';
     return checkout;
   });
@@ -353,7 +400,7 @@ function getDashboardData(data) {
 function adminForceCheckIn(data) {
   const session = getSession(data.token);
   if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
-  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  const logSheet = getSheet(LOG_SHEET_NAME);
   const logData = logSheet.getDataRange().getValues();
   let originalTrip = null;
   for(let i = logData.length - 1; i >= 1; i--) {
@@ -371,7 +418,7 @@ function adminForceCheckIn(data) {
         `Forced check-in by admin ${session.username}`
     ]);
   updateAllEpjStatuses();
-  CacheService.getScriptCache().remove('epjStatuses');
+  CacheService.getScriptCache().remove(CACHE_KEYS.EPJ_STATUSES);
   return `Successfully checked in EPJ ${data.epj}.`;
   }
   return `Error: Could not find original trip ID ${data.tripId}.`;
@@ -380,18 +427,18 @@ function adminForceCheckIn(data) {
 function updateEpjLocation(data) {
     const session = getSession(data.token);
     if (!session || (session.role !== 'Admin' && session.role !== 'Load Support')) { throw new Error("Permission denied."); }
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const logSheet = getSheet(LOG_SHEET_NAME);
     logSheet.appendRow([ '', new Date(), session.username, 'LOAD SUPPORT', '', '', data.epj, '', data.newLocation, 'Location Update', `Updated by ${session.role}`, data.newLocation, '' ]);
   updateAllEpjStatuses();
-  CacheService.getScriptCache().remove('epjStatuses');
+  CacheService.getScriptCache().remove(CACHE_KEYS.EPJ_STATUSES);
   return `Location for EPJ ${data.epj} updated to ${data.newLocation}.`;
 }
 
 function adminSetMaintenanceStatus(data) {
     const session = getSession(data.token);
     if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-    const maintSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MAINT_LOG_SHEET_NAME);
+    const logSheet = getSheet(LOG_SHEET_NAME);
+    const maintSheet = getSheet(MAINT_LOG_SHEET_NAME);
     if (data.status === 'Maintenance Start') {
       maintSheet.appendRow([new Date(), data.epj, 'Maintenance Start', data.reason || 'Reason pending', '']);
       logSheet.appendRow(['', new Date(), session.username, 'ADMIN', '', '', data.epj, '', '', 'Maintenance Start', data.reason || 'Reason pending', '', '']);
@@ -400,7 +447,7 @@ function adminSetMaintenanceStatus(data) {
       logSheet.appendRow(['', new Date(), session.username, 'ADMIN', '', '', data.epj, '', '', 'Maintenance End', 'Returned to service', '', '']);
     }
   updateAllEpjStatuses();
-  CacheService.getScriptCache().remove('epjStatuses');
+  CacheService.getScriptCache().remove(CACHE_KEYS.EPJ_STATUSES);
   return `EPJ ${data.epj} status updated.`;
 }
 
@@ -432,9 +479,14 @@ function adminMassCreateUsers(data) {
         newUsers.push([username, sha256(password), role, carrier]);
     });
     if (newUsers.length > 0) {
-        const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-        const startRow = userSheet.getLastRow() + 1;
-        userSheet.getRange(startRow, 1, newUsers.length, 4).setValues(newUsers);
+        const userSheet = getSheet(USER_SHEET_NAME);
+        if (!userSheet) {
+            errors.push('Unable to locate user sheet.');
+        } else {
+            const startRow = userSheet.getLastRow() + 1;
+            userSheet.getRange(startRow, 1, newUsers.length, 4).setValues(newUsers);
+            invalidateUserCaches();
+        }
     }
     let message = `Batch process complete. Successfully created ${newUsers.length} users.`;
     if (errors.length > 0) {
@@ -446,55 +498,65 @@ function adminMassCreateUsers(data) {
 function adminAddUser(data) {
   const session = getSession(data.token);
   if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
-  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
+  const userSheet = getSheet(USER_SHEET_NAME);
+  if (!userSheet) {
+    return `Error: Unable to locate user sheet.`;
+  }
   userSheet.appendRow([data.username, sha256(data.password), data.role, data.carrier]);
-  CacheService.getScriptCache().remove('admin_users'); // Invalidate user cache
+  invalidateUserCaches();
   return `User "${data.username}" created successfully.`;
 }
 
 function adminEditUser(data) {
   const session = getSession(data.token);
   if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
-  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-  const usernames = userSheet.getRange("A:A").getValues();
-  for (let i = 1; i < usernames.length; i++) {
-    if (usernames[i][0].toLowerCase() === data.username.toLowerCase()) {
-      userSheet.getRange(i + 1, 3).setValue(data.role);
-      userSheet.getRange(i + 1, 4).setValue(data.carrier);
-      CacheService.getScriptCache().remove('admin_users');
-      return `User "${data.username}" updated successfully.`;
-    }
+  const userSheet = getSheet(USER_SHEET_NAME);
+  if (!userSheet) {
+    return `Error: Unable to locate user sheet.`;
   }
-  return `Error: User "${data.username}" not found.`;
+  const directory = getUserDirectory();
+  const record = directory.byUsername[data.username.toLowerCase()];
+  if (!record) {
+    return `Error: User "${data.username}" not found.`;
+  }
+  userSheet.getRange(record.rowIndex, 3).setValue(data.role);
+  userSheet.getRange(record.rowIndex, 4).setValue(data.carrier);
+  invalidateUserCaches();
+  return `User "${data.username}" updated successfully.`;
 }
 
 function adminResetPassword(data) {
     const session = getSession(data.token);
     if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
-    const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-    const usernames = userSheet.getRange("A:A").getValues();
-    for (let i = 1; i < usernames.length; i++) {
-        if (usernames[i][0].toLowerCase() === data.username.toLowerCase()) {
-            userSheet.getRange(i + 1, 2).setValue(sha256(data.newPassword));
-            return `Password reset for user "${data.username}".`;
-        }
+    const userSheet = getSheet(USER_SHEET_NAME);
+    if (!userSheet) {
+        return `Error: Unable to locate user sheet.`;
     }
-    return `Error: User "${data.username}" not found.`;
+    const directory = getUserDirectory();
+    const record = directory.byUsername[data.username.toLowerCase()];
+    if (!record) {
+        return `Error: User "${data.username}" not found.`;
+    }
+    userSheet.getRange(record.rowIndex, 2).setValue(sha256(data.newPassword));
+    invalidateUserCaches();
+    return `Password reset for user "${data.username}".`;
 }
 
 function adminDeleteUser(data) {
   const session = getSession(data.token);
   if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
-  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-  const usernames = userSheet.getRange("A:A").getValues();
-  for (let i = usernames.length - 1; i > 0; i--) { 
-    if (usernames[i][0].toLowerCase() === data.username.toLowerCase()) {
-      userSheet.deleteRow(i + 1);
-      CacheService.getScriptCache().remove('admin_users');
-      return `User "${data.username}" has been deleted.`;
-    }
+  const userSheet = getSheet(USER_SHEET_NAME);
+  if (!userSheet) {
+    return `Error: Unable to locate user sheet.`;
   }
-  return `Error: User "${data.username}" not found.`;
+  const directory = getUserDirectory();
+  const record = directory.byUsername[data.username.toLowerCase()];
+  if (!record) {
+    return `Error: User "${data.username}" not found.`;
+  }
+  userSheet.deleteRow(record.rowIndex);
+  invalidateUserCaches();
+  return `User "${data.username}" has been deleted.`;
 }
 
 // --- HELPERS & DATA GETTERS ---
@@ -502,9 +564,10 @@ function getEpjInfoMap() {
     const cache = CacheService.getScriptCache();
     const cached = cache.get('epjInfoMap');
     if (cached != null) { return JSON.parse(cached); }
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const logSheet = getSheet(LOG_SHEET_NAME);
+    const epjStatusSheet = getSheet(STATUS_SHEET_NAME);
+    if (!logSheet || !epjStatusSheet) { return {}; }
     const logData = logSheet.getDataRange().getValues();
-    const epjStatusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
     const epjs = epjStatusSheet.getRange("A2:A").getValues().flat().filter(String);
     const infoMap = {};
     const foundLocations = new Set();
@@ -544,7 +607,7 @@ function getActiveCheckouts() {
     const cache = CacheService.getScriptCache();
     const cached = cache.get('activeTrips');
     if (cached != null) { return JSON.parse(cached); }
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const logSheet = getSheet(LOG_SHEET_NAME);
     if (!logSheet) { return []; }
     const lastRow = logSheet.getLastRow();
     if (lastRow < 2) return [];
@@ -587,7 +650,7 @@ function getZoneOptions() {
     const cache = CacheService.getScriptCache();
     const cached = cache.get('zoneOptions');
     if (cached != null) { return cached; }
-    const zoneSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ZONES_SHEET_NAME);
+    const zoneSheet = getSheet(ZONES_SHEET_NAME);
     if (!zoneSheet) return "";
     const zones = zoneSheet.getRange("A2:A").getValues().flat().filter(String);
     let options = '';
@@ -598,13 +661,13 @@ function getZoneOptions() {
 
 function getEpjsByStatus(status, all = false) {
   const cache = CacheService.getScriptCache();
-  const cacheKey = 'epjStatuses';
+  const cacheKey = CACHE_KEYS.EPJ_STATUSES;
   const cached = cache.get(cacheKey);
   let allStatuses;
   if (cached != null) {
     allStatuses = JSON.parse(cached);
   } else {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+    const sheet = getSheet(STATUS_SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) return [];
     const values = sheet.getRange("A2:B" + sheet.getLastRow()).getValues();
     allStatuses = values.map(row => ({epj: row[0], status: row[1]})).filter(item => item.epj);
