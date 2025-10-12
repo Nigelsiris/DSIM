@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        main { padding: 20px; }
+        td { vertical-align: middle; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <button class="secondary outline" onclick="logout()" style="position: absolute; top: 1rem; right: 1rem;">Logout</button>
+        <h1 style="text-align:center;">EPJ Location Management</h1>
+        <p>Welcome, <b><?!= username; ?></b>. Use this panel to update the location of any EPJ.</p>
+
+        <article>
+            <div class="overflow-auto">
+                <table id="epjLocationTable">
+                    <thead>
+                        <tr>
+                            <th>EPJ</th>
+                            <th>Current Status</th>
+                            <th>Current Location</th>
+                            <th>Set New Location</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- EPJ data will be populated here by the script -->
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        <p id="feedback" style="text-align:center; min-height: 20px;"></p>
+    </main>
+    <script>
+        const token = localStorage.getItem('sessionToken');
+        const epjStatuses = <?!= epjStatuses; ?>;
+        const epjInfoMap = <?!= epjInfoMap; ?>;
+        const zoneOptionsHtml = `<?!= zoneOptions; ?>`;
+
+        // Function to build the table when the page loads
+        function buildTable() {
+            const tableBody = document.querySelector('#epjLocationTable tbody');
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            epjStatuses.forEach(item => {
+                const epjNumber = item.epj;
+                const currentStatus = item.status;
+                const currentLocation = epjInfoMap[epjNumber] ? epjInfoMap[epjNumber].location : 'Unknown';
+
+                // Create the zone dropdown for each row
+                const zoneSelectId = `zone-for-${epjNumber}`;
+                const zoneDropdown = `<select id="${zoneSelectId}">${zoneOptionsHtml}</select>`;
+
+                const rowHtml = `
+                    <tr>
+                        <td><strong>${epjNumber}</strong></td>
+                        <td>${currentStatus}</td>
+                        <td>${currentLocation}</td>
+                        <td>${zoneDropdown}</td>
+                        <td><button onclick="updateLocation('${epjNumber}')">Update</button></td>
+                    </tr>
+                `;
+                tableBody.innerHTML += rowHtml;
+
+                // Pre-select the current location in the dropdown
+                if (currentLocation) {
+                    const selectElement = document.getElementById(zoneSelectId);
+                    if(selectElement) {
+                       selectElement.value = currentLocation;
+                    }
+                }
+            });
+        }
+
+        // Function to call the server to update a location
+        function updateLocation(epj) {
+            const selectId = `zone-for-${epj}`;
+            const newLocation = document.getElementById(selectId).value;
+            if (!newLocation) {
+                alert('Please select a new location.');
+                return;
+            }
+
+            document.getElementById('feedback').innerText = `Updating location for ${epj}...`;
+            google.script.run
+                .withSuccessHandler(message => {
+                    document.getElementById('feedback').innerText = message;
+                    // Refresh the page to show the new location after a short delay
+                    setTimeout(() => window.location.reload(), 2000);
+                })
+                .updateEpjLocation({ token: token, epj: epj, newLocation: newLocation });
+        }
+
+        // Build the table on page load
+        buildTable();
+    </script>
+</body>
+</html>

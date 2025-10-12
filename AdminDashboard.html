@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <base target="_top">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+        <style> main { padding: 20px; } </style>
+    </head>
+    <body>
+        <main class="container">
+            <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
+                <button class="contrast" onclick="logout()">Logout</button>
+            </div>
+
+            <h1 style="text-align:center;">Admin Control Panel</h1>
+            
+            <article>
+                <h3 style="text-align:center;">Live EPJ Status</h3>
+                <div id="statusGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;"></div>
+            </article>
+
+            <article>
+                <h3><ins>Live Check-Outs</ins></h3>
+                <div class="overflow-auto">
+                    <table id="activeCheckoutsTable">
+                        <thead><tr><th>Driver</th><th>Carrier</th><th>EPJ</th><th>Truck/Trailer</th><th>Route</th><th>Check-Out Time</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <div class="grid">
+                <article>
+                    <h3><ins>Add New User</ins></h3>
+                    <input type="text" id="newUsername" placeholder="New Username" autocomplete="off">
+                    <input type="password" id="newPassword" placeholder="New Password" autocomplete="off">
+                    <input type="text" id="newCarrier" placeholder="Carrier Name (Optional)">
+                    <select id="newRole"><option>Driver</option><option>Admin</option><option>Load Support</option></select>
+                    <button onclick="addUser()">Create User</button>
+                </article>
+                <article>
+                    <h3><ins>Maintenance Mode</ins></h3>
+                    <select id="maintenanceEpj"></select>
+                    <input type="text" id="maintenanceReason" placeholder="Reason for maintenance (optional)">
+                    <select id="maintenanceAction">
+                        <option value="Maintenance Start">Put IN Maintenance</option>
+                        <option value="Maintenance End">Return FROM Maintenance</option>
+                    </select>
+                    <button onclick="setMaintenance()">Update Status</button>
+                </article>
+            </div>
+            
+            <article>
+                <h3><ins>Mass Create Users</ins></h3>
+                <blockquote>
+                    Paste user data below in CSV format, one user per line:<br>
+                    <small><b>Format:</b> <code>username,password,Role,CarrierName</code></small><br>
+                    <small><b>Example:</b> <code>jdoe,Password123,Driver,Carrier A</code></small>
+                </blockquote>
+                <textarea id="massUserCsv" placeholder="user1,pass1,Driver,Carrier A&#10;user2,pass2,Admin,Carrier B" style="height: 150px;"></textarea>
+                <button onclick="massCreateUsers()">Create Multiple Users</button>
+            </article>
+
+            <article>
+                <button id="userMgmtBtn" style="width:100%;margin-top:2em;" onclick="openUserManagement()">Open User Management</button>
+            </article>
+
+            <article>
+                <h3><ins>Recent Maintenance Events</ins></h3>
+                <div class="overflow-auto">
+                    <table id="maintenanceTable">
+                        <thead><tr><th>Timestamp</th><th>EPJ</th><th>Event</th><th>Reason</th><th>Resolution</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <p id="feedback" style="text-align:center; min-height: 20px;"></p>
+        </main>
+
+        <script>
+            // Assign the token to the global sessionToken variable.
+            sessionToken = "<?= token ?>";
+
+            let isFirstLoad = true;
+            
+            // Clear any previously existing timer before this script runs again.
+            if (window.dashboardRefreshTimer) {
+                clearInterval(window.dashboardRefreshTimer);
+            }
+
+            function logout() {
+              if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
+              google.script.run.withSuccessHandler(() => {
+                document.querySelector('main').innerHTML = '<h1>You have been logged out.</h1>';
+              }).logoutUser({token: sessionToken});
+            }
+
+            function loadDashboardData() {
+                if (isFirstLoad) { document.getElementById('feedback').innerText = 'Loading data...'; }
+                google.script.run
+                    .withSuccessHandler(populateDashboard)
+                    .withFailureHandler(err => {
+                        document.getElementById('feedback').innerText = `Error loading data: ${err.message}`;
+                        if (err.message.includes("Permission denied")) { 
+                            if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
+                            setTimeout(logout, 2000); 
+                        }
+                    })
+                    .getDashboardData({token: sessionToken});
+            }
+            
+            loadDashboardData();
+            // Assign the timer to a property on the global 'window' object to prevent re-declaration errors.
+            window.dashboardRefreshTimer = setInterval(loadDashboardData, 60000);
+
+            function populateDashboard(data) {
+                if (!data) { document.getElementById('feedback').innerText = 'Error: No data loaded.'; return; }
+                const grid = document.getElementById('statusGrid');
+                const maintenanceSelect = document.getElementById('maintenanceEpj');
+                grid.innerHTML = '';
+                maintenanceSelect.innerHTML = '<option disabled selected>Select EPJ...</option>';
+                data.epjStatuses.forEach(item => {
+                    let color = item.status === 'Available' ? 'green' : (item.status === 'Checked Out' ? 'red' : 'orange');
+                    grid.innerHTML += `<div style='border:1px solid ${color}; color:${color}; padding:10px; text-align:center; border-radius:5px;'><b>${item.epj}</b><br><small>${item.status}</small></div>`;
+                    maintenanceSelect.innerHTML += `<option>${item.epj}</option>`;
+                });
+                const activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
+                activeTableBody.innerHTML = '';
+                data.activeCheckouts.forEach(trip => {
+                    activeTableBody.innerHTML += `<tr><td>${trip.driver}</td><td>${trip.carrier}</td><td>${trip.epj}</td><td>${trip.truck} / ${trip.trailer}</td><td>${trip.route}</td><td>${trip.timestamp}</td><td><button class="secondary outline" onclick="forceCheckIn('${trip.tripId}', '${trip.epj}')">Force Check-In</button></td></tr>`;
+                });
+                const maintTableBody = document.querySelector('#maintenanceTable tbody');
+                maintTableBody.innerHTML = '';
+                if (data.maintenanceLog) {
+                    data.maintenanceLog.forEach(row => {
+                        const timestamp = new Date(row[0]).toLocaleString();
+                        maintTableBody.innerHTML += `<tr><td>${timestamp}</td><td>${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`;
+                    });
+                }
+                document.getElementById('feedback').innerText = '';
+                isFirstLoad = false;
+            }
+            function openUserManagement() {
+                google.script.run.withSuccessHandler(function(html) {
+                    document.open(); document.write(html); document.close();
+                }).getUserManagementPage(sessionToken);
+            }
+            
+            function handleSuccess(message) {
+                document.getElementById('feedback').innerText = message;
+                const fieldsToClear = ['newUsername', 'newPassword', 'newCarrier', 'massUserCsv'];
+                fieldsToClear.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+                setTimeout(loadDashboardData, 500);
+            }
+
+            function massCreateUsers() {
+                const csvData = document.getElementById('massUserCsv').value;
+                if (!csvData.trim()) {
+                    alert('Please paste user data into the text box.');
+                    return;
+                }
+                const userCount = csvData.split('\n').filter(line => line.trim() !== '').length;
+                if (confirm(`Are you sure you want to create ${userCount} new user(s)?`)) {
+                    document.getElementById('feedback').innerText = 'Processing batch user creation...';
+                    google.script.run.withSuccessHandler(handleSuccess).adminMassCreateUsers({token: sessionToken, csvData: csvData});
+                }
+            }
+
+            function forceCheckIn(tripId, epj) {
+                if (confirm(`Are you sure you want to force check-in EPJ ${epj}?`)) {
+                    google.script.run.withSuccessHandler(handleSuccess).adminForceCheckIn({token: sessionToken, tripId: tripId, epj: epj});
+                }
+            }
+
+            function addUser() {
+                const username = document.getElementById('newUsername').value;
+                const password = document.getElementById('newPassword').value;
+                const role = document.getElementById('newRole').value;
+                const carrier = document.getElementById('newCarrier').value;
+                if(!username || !password) { alert('Username and Password are required.'); return; }
+                google.script.run.withSuccessHandler(handleSuccess).adminAddUser({token: sessionToken, username: username, password: password, role: role, carrier: carrier});
+            }
+
+            function setMaintenance() {
+                const epj = document.getElementById('maintenanceEpj').value;
+                const action = document.getElementById('maintenanceAction').value;
+                const reason = document.getElementById('maintenanceReason').value;
+                if(!epj) { alert("Please select an EPJ."); return; }
+                google.script.run.withSuccessHandler(handleSuccess).adminSetMaintenanceStatus({token: sessionToken, epj: epj, status: action, reason: reason});
+            }
+
+            function editUser(username, currentRole, currentCarrier) {
+                const newRole = prompt(`Enter new role for "${username}": (Current: ${currentRole})`, currentRole);
+                if (newRole === null) return;
+                const newCarrier = prompt(`Enter new carrier for "${username}": (Current: ${currentCarrier})`, currentCarrier);
+                if (newCarrier !== null) {
+                    google.script.run.withSuccessHandler(handleSuccess).adminEditUser({token: sessionToken, username: username, role: newRole, carrier: newCarrier});
+                }
+            }
+            
+            function resetPassword(username) {
+                const newPassword = prompt(`Enter a new password for user "${username}":`);
+                if (newPassword) {
+                    google.script.run.withSuccessHandler(handleSuccess).adminResetPassword({token: sessionToken, username: username, newPassword: newPassword});
+                }
+            }
+            
+            function deleteUser(username) {
+                if (confirm(`Are you sure you want to permanently delete user "${username}"?`)) {
+                    google.script.run.withSuccessHandler(handleSuccess).adminDeleteUser({token: sessionToken, username: username});
+                }
+            }
+        </script>
+    </body>
+</html>
+

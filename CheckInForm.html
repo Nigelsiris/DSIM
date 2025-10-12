@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style> 
+        main { max-width: 800px; margin: 2rem auto; }
+        
+        label input[type="checkbox"] {
+            width: auto;
+            margin-right: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <article>
+            <div style="position: absolute; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.75rem; z-index: 10;">
+                <button class="outline" onclick="loadProfilePage()">My Profile</button>
+                <button class="contrast" onclick="logout()">Logout</button>
+            </div>
+            
+            <h2>Driver Check-In</h2>
+            <p>Welcome back, <b><?!= username; ?></b></p>
+            <p>You currently have <b>EPJ <?!= tripInfo.epj; ?></b> checked out.</p>
+
+            <label for="checkInZone">Final Location of EPJ</label>
+            <select id="checkInZone"><?!= zoneOptions; ?></select>
+
+            <label for="faultReport">Post-Trip: Report any new issues (optional)</label>
+            <textarea id="faultReport" placeholder="e.g., Battery died quickly, makes a grinding noise..."></textarea>
+
+            <label style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                <input type="checkbox" id="pluggedInConfirmation" name="confirm">
+                I confirm that the EPJ is plugged in and ready for the next driver.
+            </label>
+
+            <button id="checkInBtn" onclick="checkIn()">Complete Check-In</button>
+            <p id="feedback" style="text-align:center; min-height:20px;"></p>
+        </article>
+    </main>
+    <script>
+        function checkIn() {
+            const confirmationCheckbox = document.getElementById('pluggedInConfirmation');
+            const checkInBtn = document.getElementById('checkInBtn');
+            if (!confirmationCheckbox.checked) {
+                alert('You must confirm the EPJ is plugged in before checking it in.');
+                return;
+            }
+            const checkInZone = document.getElementById('checkInZone').value;
+            if (!checkInZone) {
+                alert('Please select the final location of the EPJ.');
+                return;
+            }
+            const faultReport = document.getElementById('faultReport').value;
+            document.getElementById("feedback").innerText = "Processing Check-In...";
+            checkInBtn.disabled = true;
+            google.script.run.withSuccessHandler(onSuccess).processCheckIn({
+                token: sessionToken, 
+                checkInZone: checkInZone, 
+                faultReport: faultReport,
+                pluggedIn: confirmationCheckbox.checked
+            });
+        }
+        
+        function onSuccess(message) {
+            const checkInBtn = document.getElementById('checkInBtn');
+            if (message.startsWith('Error:')) {
+                document.getElementById("feedback").innerText = '';
+                checkInBtn.disabled = false;
+                alert(message);
+            } else {
+                document.querySelector('article').innerHTML = `
+                    <h2>Success!</h2>
+                    <p>${message}</p>
+                    <p>Returning to login screen...</p>
+                `;
+                setTimeout(logout, 2000);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        main { max-width: 800px; margin: 2rem auto; }
+        #epjInfoDisplay {
+            padding: 0.75rem; border-radius: 0.25rem;
+            background-color: var(--card-background-color); border: var(--card-border);
+            margin-top: 1rem; min-height: 70px;
+        }
+        input[readonly] { background-color: var(--pico-muted-border-color); }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <article>
+            <div style="position: absolute; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.75rem; z-index: 10;">
+                <button class="outline" onclick="loadProfilePage()">My Profile</button>
+                <button class="contrast" onclick="logout()">Logout</button>
+            </div>
+            
+            <h2>Driver Check-Out</h2>
+            <p>Welcome, <b><?!= username; ?></b>. Please confirm your details to check out an EPJ.</p>
+
+            <form id="checkOutForm">
+                <div class="grid">
+                    <label>Driver Name<input type="text" id="driverName" name="driverName" value="<?!= username; ?>" readonly></label>
+                    <label>Truck Number<input type="text" id="truckNumber" name="truckNumber" required></label>
+                </div>
+                <div class="grid">
+                    <label>Trailer Number<input type="text" id="trailerNumber" name="trailerNumber" required></label>
+                    <label>Route Number<input type="text" id="route" name="route" required></label>
+                </div>
+                
+                <hr>
+
+                <label for="zoneFilter">Filter by Zone</label>
+                <select id="zoneFilter">
+                    <option value="All" selected>Show All Zones</option>
+                    <?!= zoneOptions; ?>
+                </select>
+
+                <label for="epjNumber">Select EPJ</label>
+                <select id="epjNumber" name="epjNumber" required disabled>
+                    <option value="" disabled selected>Please select a zone first</option>
+                </select>
+
+                <div id="epjInfoDisplay"><small>Select an EPJ to see its last reported status.</small></div>
+
+                <label for="faultReport">Pre-Trip: Report any existing issues (optional)</label>
+                <textarea id="faultReport" name="faultReport" placeholder="e.g., Fork is slightly bent, battery cover is cracked..."></textarea>
+                
+                <button type="submit">Complete Check-Out</button>
+                <p id="feedback" style="text-align:center; min-height:20px;"></p>
+            </form>
+        </article>
+    </main>
+    <script>
+        const epjInfoMap = <?!= JSON.stringify(epjInfoMap) ?>;
+        const availableEpjs = <?!= availableEpjs; ?>;
+
+        const zoneFilter = document.getElementById('zoneFilter');
+        const epjSelect = document.getElementById('epjNumber');
+        const infoDisplay = document.getElementById('epjInfoDisplay');
+
+        function updateEpjList() {
+            const selectedZone = zoneFilter.value;
+            epjSelect.innerHTML = ''; 
+            epjSelect.disabled = false;
+            let epjsInZone = 0;
+            
+            availableEpjs.forEach(epj => {
+                const epjLocation = epjInfoMap[epj] ? epjInfoMap[epj].location : 'Unknown';
+                if (selectedZone === 'All' || epjLocation === selectedZone) {
+                    const option = document.createElement('option');
+                    option.value = epj;
+                    option.textContent = epj;
+                    epjSelect.appendChild(option);
+                    epjsInZone++;
+                }
+            });
+
+            if (epjsInZone === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'No available EPJs in this zone';
+                option.disabled = true;
+                epjSelect.appendChild(option);
+            }
+            epjSelect.value = ''; 
+            infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
+        }
+        
+        zoneFilter.addEventListener('change', updateEpjList);
+        epjSelect.addEventListener('change', function() {
+            const selectedEpj = this.value;
+            if (selectedEpj && epjInfoMap[selectedEpj]) {
+                const info = epjInfoMap[selectedEpj];
+                infoDisplay.innerHTML = `<small><b>Last Location:</b> ${info.location || 'N/A'}<br><b>Last Reported Fault:</b> ${info.fault || 'None'}</small>`;
+            } else {
+                infoDisplay.innerHTML = `<small>Select an EPJ to see its last reported status.</small>`;
+            }
+        });
+        
+        updateEpjList();
+
+        document.getElementById('checkOutForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = {
+                token: sessionToken,
+                driverName: document.getElementById('driverName').value,
+                truckNumber: document.getElementById('truckNumber').value,
+                trailerNumber: document.getElementById('trailerNumber').value,
+                route: document.getElementById('route').value,
+                epjNumber: document.getElementById('epjNumber').value,
+                faultReport: document.getElementById('faultReport').value
+            };
+            if (!formData.epjNumber) { alert('Please select an EPJ.'); return; }
+            document.getElementById("feedback").innerText = "Processing Check-Out...";
+            google.script.run.withSuccessHandler(onSuccess).processCheckOut(formData);
+        });
+        
+        function onSuccess(message) {
+             if (message.startsWith('Error:')) {
+                document.getElementById("feedback").innerText = '';
+                alert(message);
+            } else {
+                document.getElementById('content').innerHTML = `
+                    <main class="container" style="max-width: 800px; margin: 2rem auto;">
+                        <article>
+                            <h2>Success!</h2>
+                            <p>${message}</p>
+                            <p>Returning to login screen...</p>
+                        </article>
+                    </main>`;
+                setTimeout(logout, 2000);
+            }
+        }
+    </script>
+</body>
+</html>
