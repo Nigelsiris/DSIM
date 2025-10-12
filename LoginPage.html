@@ -13,6 +13,7 @@
 <body>
     <div id="topRightControls" style="position: absolute; top: 1rem; right: 1rem; z-index: 10; display: flex; gap: 8px; align-items: center;"></div>
     <main class="container">
+
         <article>
             <div style="text-align: center;">
                 <h2>System Login</h2>
@@ -31,6 +32,19 @@
             </div>
         </article>
 
+        <? if (activeDrivers && activeDrivers.length > 0) { ?>
+        <section id="quickLogin">
+            <h5>Quick Login for Check-In:</h5>
+            <div class="grid">
+                <? for (var i = 0; i < activeDrivers.length; i++) { ?>
+                    <button class="secondary outline quick-login-button" onclick="prefillLogin('<?= activeDrivers[i].username ?>')" id="quick-login-<?= i ?>">
+                        <?= activeDrivers[i].displayName ?>
+                    </button>
+                <? } ?>
+            </div>
+        </section>
+        <? } ?>
+
 
     </main>
     <div class="loading-overlay">
@@ -39,6 +53,37 @@
     <div id="toast" style="display:none; position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:12px 24px; border-radius:24px; z-index:3000; font-size:1rem; min-width:120px; text-align:center;"></div>
 
     <script>
+        // --- Progress bar and spinner helpers ---
+        function updateProgress(step) {
+            const progressBar = document.getElementById("loginProgress");
+            const fill = progressBar.querySelector(".fill");
+            progressBar.style.display = "block";
+            fill.style.width = `${step * 33.33}%`;
+        }
+
+        function showSpinner(show) {
+            const spinner = document.querySelector(".spinner");
+            spinner.style.display = show ? "inline-block" : "none";
+        }
+        // Ensure login button works and Enter key submits
+        document.getElementById("loginButton").addEventListener("click", attemptLogin);
+        document.getElementById("password").addEventListener("keydown", function(e) {
+            if (e.key === "Enter") attemptLogin();
+        });
+
+        function prefillLogin(username) {
+            const buttonId = Array.from(document.querySelectorAll('.quick-login-button')).find(
+                btn => btn.textContent.trim() === username
+            )?.id;
+            if (buttonId) {
+                document.getElementById(buttonId).setAttribute("aria-busy", "true");
+            }
+            document.getElementById('username').value = username;
+            document.getElementById('password').focus();
+            setTimeout(() => {
+                if (buttonId) document.getElementById(buttonId).removeAttribute("aria-busy");
+            }, 500);
+        }
         // --- Theme management ---
         const THEME_KEY = 'dsim_theme';
         function initTheme() {
