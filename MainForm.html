@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <base target="_top">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <base target="_top">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <div style="padding: 20px;">
+  <div id="topRightControls" style="position: absolute; top: 1rem; right: 1rem; z-index: 10; display: flex; gap: 8px; align-items: center;"></div>
+  <div style="padding: 20px;">
       <h2>Driver Sign-In</h2>
       <div class="block">
         <label for="driverName">Driver Name</label>
@@ -33,7 +35,56 @@
       <button class="action" id="submitButton">Submit Sign-In</button>
       <div id="message" style="margin-top: 10px;"></div>
     </div>
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    <div id="toast" style="display:none; position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:12px 24px; border-radius:24px; z-index:3000; font-size:1rem; min-width:120px; text-align:center;"></div>
     <script>
+      // --- Theme management ---
+      const THEME_KEY = 'dsim_theme';
+      function initTheme() {
+        const savedTheme = localStorage.getItem(THEME_KEY) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        addThemeToggle();
+      }
+      function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem(THEME_KEY, newTheme);
+      }
+      function addThemeToggle() {
+        if (document.getElementById('themeToggleBtn')) return;
+        const toggle = document.createElement('button');
+        toggle.className = 'theme-toggle';
+        toggle.id = 'themeToggleBtn';
+        toggle.innerHTML = `<span>🌓</span><span>Theme</span>`;
+        toggle.onclick = toggleTheme;
+        const controls = document.getElementById('topRightControls');
+        if (controls) {
+          controls.appendChild(toggle);
+        } else {
+          document.body.appendChild(toggle);
+        }
+      }
+      // --- Loading overlay ---
+      function showLoading() { document.querySelector('.loading-overlay').style.display = 'flex'; }
+      function hideLoading() { document.querySelector('.loading-overlay').style.display = 'none'; }
+      // --- Toasts ---
+      function showToast(msg, isError) {
+        const toast = document.getElementById('toast');
+        toast.innerText = msg;
+        toast.style.background = isError ? '#c0392b' : '#222';
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 2500);
+      }
+      // --- Keyboard shortcuts ---
+      document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+          document.getElementById('submitButton').click();
+        }
+      });
+      // --- Form logic ---
       document.getElementById("submitButton").addEventListener("click", function() {
         var formData = {
           driverName: document.getElementById("driverName").value,
@@ -42,19 +93,27 @@
           route: document.getElementById("route").value,
           epjNumber: document.getElementById("epjNumber").value
         };
-
         // Basic validation
         if (!formData.driverName || !formData.truckNumber || !formData.trailerNumber || !formData.route || !formData.epjNumber) {
           document.getElementById("message").innerText = "Please fill out all fields.";
+          showToast('Please fill out all fields.', true);
           return;
         }
-
         document.getElementById("message").innerText = "Processing...";
+        showLoading();
         google.script.run.withSuccessHandler(function(response) {
            document.getElementById("message").innerHTML = '<h3 style="color:green;">Success!</h3><p>You can now close this window.</p>';
            document.getElementById("submitButton").disabled = true;
+           hideLoading();
+           showToast('Sign-in successful!');
+        }).withFailureHandler(function(err) {
+           document.getElementById("message").innerText = 'Error: ' + (err.message || 'Sign-in failed.');
+           hideLoading();
+           showToast('Sign-in failed.', true);
         }).processSignIn(formData);
       });
+      // --- Init theme ---
+      initTheme();
     </script>
   </body>
 </html>
