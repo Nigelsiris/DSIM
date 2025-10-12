@@ -33,6 +33,7 @@
       </div>
       <br>
       <button class="action" id="submitButton">Submit Sign-In</button>
+      <button class="secondary" id="clearSavedInfoButton" type="button">Clear Saved Info</button>
       <div id="message" style="margin-top: 10px;"></div>
     </div>
     <div class="loading-overlay">
@@ -40,6 +41,9 @@
     </div>
     <div id="toast" style="display:none; position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:12px 24px; border-radius:24px; z-index:3000; font-size:1rem; min-width:120px; text-align:center;"></div>
     <script>
+      // --- Constants ---
+      const FORM_STORAGE_KEY = 'dsim_main_form_data';
+
       // --- Theme management ---
       const THEME_KEY = 'dsim_theme';
       function initTheme() {
@@ -78,6 +82,84 @@
         toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 2500);
       }
+
+      // --- Form persistence helpers ---
+      function getFormFields() {
+        return {
+          driverName: document.getElementById('driverName'),
+          truckNumber: document.getElementById('truckNumber'),
+          trailerNumber: document.getElementById('trailerNumber'),
+          route: document.getElementById('route'),
+          epjNumber: document.getElementById('epjNumber')
+        };
+      }
+
+      function sanitizeValue(value) {
+        return value ? value.trim() : '';
+      }
+
+      function persistFormData() {
+        const fields = getFormFields();
+        const data = {
+          driverName: sanitizeValue(fields.driverName.value),
+          truckNumber: sanitizeValue(fields.truckNumber.value).toUpperCase(),
+          trailerNumber: sanitizeValue(fields.trailerNumber.value).toUpperCase(),
+          route: sanitizeValue(fields.route.value),
+          epjNumber: sanitizeValue(fields.epjNumber.value)
+        };
+
+        const allEmpty = Object.values(data).every(val => !val);
+        if (allEmpty) {
+          localStorage.removeItem(FORM_STORAGE_KEY);
+          return;
+        }
+
+        localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function loadSavedFormData() {
+        const fields = getFormFields();
+        try {
+          const saved = JSON.parse(localStorage.getItem(FORM_STORAGE_KEY));
+          if (!saved) return;
+
+          if (saved.driverName) fields.driverName.value = saved.driverName;
+          if (saved.truckNumber) fields.truckNumber.value = saved.truckNumber;
+          if (saved.trailerNumber) fields.trailerNumber.value = saved.trailerNumber;
+          if (saved.route) fields.route.value = saved.route;
+          if (saved.epjNumber && fields.epjNumber.querySelector(`option[value="${saved.epjNumber}"]`)) {
+            fields.epjNumber.value = saved.epjNumber;
+          }
+        } catch (e) {
+          console.warn('Unable to parse saved form data', e);
+          localStorage.removeItem(FORM_STORAGE_KEY);
+        }
+      }
+
+      function clearSavedFormData(showMessage = true) {
+        localStorage.removeItem(FORM_STORAGE_KEY);
+        const fields = getFormFields();
+        fields.driverName.value = '';
+        fields.truckNumber.value = '';
+        fields.trailerNumber.value = '';
+        fields.route.value = '';
+        if (fields.epjNumber.options && fields.epjNumber.options.length > 0) {
+          fields.epjNumber.selectedIndex = 0;
+        } else {
+          fields.epjNumber.value = '';
+        }
+        if (showMessage) {
+          showToast('Saved info cleared.');
+        }
+      }
+
+      function forceUppercaseOnBlur(element) {
+        if (!element) return;
+        element.addEventListener('blur', () => {
+          element.value = sanitizeValue(element.value).toUpperCase();
+          persistFormData();
+        });
+      }
       // --- Keyboard shortcuts ---
       document.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'Enter') {
@@ -106,6 +188,7 @@
            document.getElementById("submitButton").disabled = true;
            hideLoading();
            showToast('Sign-in successful!');
+           clearSavedFormData(false);
         }).withFailureHandler(function(err) {
            document.getElementById("message").innerText = 'Error: ' + (err.message || 'Sign-in failed.');
            hideLoading();
@@ -114,6 +197,29 @@
       });
       // --- Init theme ---
       initTheme();
+      loadSavedFormData();
+
+      const { driverName, truckNumber, trailerNumber, route, epjNumber } = getFormFields();
+      [driverName, truckNumber, trailerNumber, route, epjNumber].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', () => {
+          if (el === truckNumber || el === trailerNumber) {
+            el.value = el.value.toUpperCase();
+          }
+          persistFormData();
+        });
+        el.addEventListener('change', persistFormData);
+      });
+
+      forceUppercaseOnBlur(truckNumber);
+      forceUppercaseOnBlur(trailerNumber);
+
+      const clearButton = document.getElementById('clearSavedInfoButton');
+      if (clearButton) {
+        clearButton.addEventListener('click', function() {
+          clearSavedFormData();
+        });
+      }
     </script>
   </body>
 </html>
