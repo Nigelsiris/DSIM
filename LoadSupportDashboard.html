@@ -3,14 +3,18 @@
 <head>
     <base target="_top">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <?!= include('SharedStyles'); ?>
+    <?!= include('AppShellStyles'); ?>
     <style>
         main { padding: 20px; }
         td { vertical-align: middle; }
     </style>
 </head>
 <body>
+    <div id="topRightControls" class="top-controls">
+        <button class="contrast" onclick="logout()">Logout</button>
+    </div>
     <main class="container">
-        <button class="secondary outline" onclick="logout()" style="position: absolute; top: 1rem; right: 1rem;">Logout</button>
         <h1 style="text-align:center;">EPJ Location Management</h1>
         <p>Welcome, <b><?!= username; ?></b>. Use this panel to update the location of any EPJ.</p>
 
@@ -34,7 +38,14 @@
         </article>
         <p id="feedback" style="text-align:center; min-height: 20px;"></p>
     </main>
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
+
+    <?!= include('AppShellScript'); ?>
     <script>
+        const app = AppShell.init();
         const token = localStorage.getItem('sessionToken');
         const epjStatuses = <?!= epjStatuses; ?>;
         const epjInfoMap = <?!= epjInfoMap; ?>;
@@ -80,16 +91,23 @@
             const selectId = `zone-for-${epj}`;
             const newLocation = document.getElementById(selectId).value;
             if (!newLocation) {
-                alert('Please select a new location.');
+                app.toast('Please select a new location.', { variant: 'error' });
                 return;
             }
 
             document.getElementById('feedback').innerText = `Updating location for ${epj}...`;
+            app.showLoading();
             google.script.run
                 .withSuccessHandler(message => {
                     document.getElementById('feedback').innerText = message;
+                    app.toast(message);
+                    app.hideLoading();
                     // Refresh the page to show the new location after a short delay
                     setTimeout(() => window.location.reload(), 2000);
+                })
+                .withFailureHandler(err => {
+                    app.toast(err.message || 'Failed to update location', { variant: 'error' });
+                    app.hideLoading();
                 })
                 .updateEpjLocation({ token: token, epj: epj, newLocation: newLocation });
         }

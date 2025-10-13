@@ -3,10 +3,12 @@
 <head>
     <base target="_top">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <?!= include('SharedStyles'); ?>
+    <?!= include('AppShellStyles'); ?>
     <style> main { padding: 20px; } </style>
 </head>
 <body>
-    <div id="topRightControls" style="position: absolute; top: 1rem; right: 1rem; z-index: 10; display: flex; gap: 8px; align-items: center;">
+    <div id="topRightControls" class="top-controls">
         <button class="contrast" onclick="logout()">Logout</button>
         <button onclick="goBack()">Back to Dashboard</button>
         <!-- Theme toggle will be injected here -->
@@ -31,59 +33,22 @@
     <div class="loading-overlay">
         <div class="loading-spinner"></div>
     </div>
-    <div id="modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:2000; align-items:center; justify-content:center;">
-        <div id="modalContent" style="background:#fff; color:#222; padding:2em; border-radius:8px; min-width:300px; max-width:90vw; box-shadow:0 2px 16px rgba(0,0,0,0.2);"></div>
+    <div id="modal" class="modal-overlay" role="dialog" aria-modal="true">
+        <div id="modalContent" class="modal-content"></div>
     </div>
-    <div id="toast" style="display:none; position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#222; color:#fff; padding:12px 24px; border-radius:24px; z-index:3000; font-size:1rem; min-width:120px; text-align:center;"></div>
+    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
 
+    <?!= include('AppShellScript'); ?>
     <script>
-        // ...existing code...
-        // --- Theme management ---
-        const THEME_KEY = 'dsim_theme';
-        function initTheme() {
-            const savedTheme = localStorage.getItem(THEME_KEY) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            addThemeToggle();
-        }
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem(THEME_KEY, newTheme);
-        }
-        function addThemeToggle() {
-            if (document.getElementById('themeToggleBtn')) return;
-            const toggle = document.createElement('button');
-            toggle.className = 'theme-toggle';
-            toggle.id = 'themeToggleBtn';
-            toggle.innerHTML = `<span>🌓</span><span>Theme</span>`;
-            toggle.onclick = toggleTheme;
-            const controls = document.getElementById('topRightControls');
-            if (controls) {
-                controls.appendChild(toggle);
-            } else {
-                document.body.appendChild(toggle);
-            }
-        }
-        // --- Loading overlay ---
-        function showLoading() { document.querySelector('.loading-overlay').style.display = 'flex'; }
-        function hideLoading() { document.querySelector('.loading-overlay').style.display = 'none'; }
-        // --- Toasts ---
-        function showToast(msg, isError) {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.style.background = isError ? '#c0392b' : '#222';
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 2500);
-        }
+        const app = AppShell.init();
         // --- Modal ---
         function showModal(html, onConfirm, onCancel) {
             const modal = document.getElementById('modal');
             const content = document.getElementById('modalContent');
             content.innerHTML = html + `<div style='margin-top:1em; text-align:right;'><button id='modalOk'>OK</button> <button id='modalCancel'>Cancel</button></div>`;
-            modal.style.display = 'flex';
-            document.getElementById('modalOk').onclick = () => { modal.style.display = 'none'; if (onConfirm) onConfirm(); };
-            document.getElementById('modalCancel').onclick = () => { modal.style.display = 'none'; if (onCancel) onCancel(); };
+            modal.classList.add('is-visible');
+            document.getElementById('modalOk').onclick = () => { modal.classList.remove('is-visible'); if (onConfirm) onConfirm(); };
+            document.getElementById('modalCancel').onclick = () => { modal.classList.remove('is-visible'); if (onCancel) onCancel(); };
         }
         // --- Pagination ---
         let allUsers = [];
@@ -95,26 +60,26 @@
         // --- Main logic ---
         sessionToken = "<?= token ?>";
         function logout() {
-            showLoading();
+            app.showLoading();
             google.script.run
                 .withSuccessHandler(() => {
                     document.querySelector('main').innerHTML = '<h1>You have been logged out.</h1>';
-                    hideLoading();
+                    app.hideLoading();
                 })
-                .withFailureHandler(() => { hideLoading(); })
+                .withFailureHandler(() => { app.hideLoading(); })
                 .logoutUser({token: sessionToken});
         }
         function goBack() {
-            showLoading();
+            app.showLoading();
             google.script.run
                 .withSuccessHandler(function(html) {
                     document.open(); document.write(html); document.close();
                 })
-                .withFailureHandler(() => { hideLoading(); })
+                .withFailureHandler(() => { app.hideLoading(); })
                 .getAdminPageHtml(sessionToken);
         }
         function loadUsers() {
-            showLoading();
+            app.showLoading();
             document.getElementById('feedback').innerText = 'Loading users...';
             google.script.run
                 .withSuccessHandler(response => {
@@ -122,12 +87,12 @@
                     filteredUsers = allUsers;
                     currentPage = 1;
                     renderTable();
-                    hideLoading();
+                    app.hideLoading();
                 })
                 .withFailureHandler(function(err) {
                     document.getElementById('feedback').innerText = 'Error loading users: ' + err.message;
-                    showToast('Error loading users', true);
-                    hideLoading();
+                    app.toast('Error loading users', { variant: 'error' });
+                    app.hideLoading();
                 })
                 .getAllUsers({token: sessionToken});
         }
@@ -177,28 +142,28 @@
         }
         // --- Inline editing ---
         function inlineEditRole(username, newRole) {
-            showLoading();
+            app.showLoading();
             google.script.run
                 .withSuccessHandler(() => {
-                    showToast('Role updated');
+                    app.toast('Role updated');
                     loadUsers();
                 })
                 .withFailureHandler(err => {
-                    showToast('Error updating role', true);
-                    hideLoading();
+                    app.toast('Error updating role', { variant: 'error' });
+                    app.hideLoading();
                 })
                 .adminEditUser({token: sessionToken, username, role: newRole, carrier: getCarrier(username)});
         }
         function inlineEditCarrier(username, newCarrier) {
-            showLoading();
+            app.showLoading();
             google.script.run
                 .withSuccessHandler(() => {
-                    showToast('Carrier updated');
+                    app.toast('Carrier updated');
                     loadUsers();
                 })
                 .withFailureHandler(err => {
-                    showToast('Error updating carrier', true);
-                    hideLoading();
+                    app.toast('Error updating carrier', { variant: 'error' });
+                    app.hideLoading();
                 })
                 .adminEditUser({token: sessionToken, username, role: getRole(username), carrier: newCarrier});
         }
@@ -214,21 +179,21 @@
         function resetPassword(username) {
             showModal(`Enter a new password for <b>${username}</b>:<br><input type='password' id='newPassInput' style='width:100%;margin-top:0.5em;'>`, function() {
                 const newPassword = document.getElementById('newPassInput').value;
-                if (!newPassword) { showToast('Password required', true); return; }
-                showLoading();
+                if (!newPassword) { app.toast('Password required', { variant: 'error' }); return; }
+                app.showLoading();
                 google.script.run
-                    .withSuccessHandler(() => { showToast('Password reset'); loadUsers(); })
-                    .withFailureHandler(err => { showToast('Error resetting password', true); hideLoading(); })
+                    .withSuccessHandler(() => { app.toast('Password reset'); loadUsers(); })
+                    .withFailureHandler(err => { app.toast('Error resetting password', { variant: 'error' }); app.hideLoading(); })
                     .adminResetPassword({token: sessionToken, username, newPassword});
             });
         }
         // --- Delete user ---
         function deleteUser(username) {
             showModal(`Are you sure you want to permanently delete <b>${username}</b>?`, function() {
-                showLoading();
+                app.showLoading();
                 google.script.run
-                    .withSuccessHandler(() => { showToast('User deleted'); loadUsers(); })
-                    .withFailureHandler(err => { showToast('Error deleting user', true); hideLoading(); })
+                    .withSuccessHandler(() => { app.toast('User deleted'); loadUsers(); })
+                    .withFailureHandler(err => { app.toast('Error deleting user', { variant: 'error' }); app.hideLoading(); })
                     .adminDeleteUser({token: sessionToken, username});
             });
         }
@@ -236,13 +201,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('bulkDeleteBtn').onclick = function() {
                 showModal(`Delete <b>${selectedUsers.size}</b> selected users?`, function() {
-                    showLoading();
+                    app.showLoading();
                     const users = Array.from(selectedUsers);
                     let done = 0;
                     users.forEach(u => {
                         google.script.run
-                            .withSuccessHandler(() => { if (++done === users.length) { showToast('Users deleted'); loadUsers(); } })
-                            .withFailureHandler(() => { if (++done === users.length) { showToast('Users deleted'); loadUsers(); } })
+                            .withSuccessHandler(() => { if (++done === users.length) { app.toast('Users deleted'); loadUsers(); } })
+                            .withFailureHandler(() => { if (++done === users.length) { app.toast('Users deleted'); loadUsers(); } })
                             .adminDeleteUser({token: sessionToken, username: u});
                     });
                 });
@@ -286,7 +251,6 @@
             if (e.key === 'Escape') { document.getElementById('searchInput').value = ''; filteredUsers = allUsers; renderTable(); }
         });
         // --- Init ---
-        initTheme();
         loadUsers();
     </script>
 </body>
