@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+      main { max-width: 900px; margin: 2rem auto; }
+      .status-available { color: var(--pico-color-green-500); }
+      .status-checked-out { color: var(--pico-color-red-500); }
+      .status-maintenance { color: var(--pico-color-orange-500); }
+      .clickable-row { cursor: pointer; }
+      .clickable-row:hover { background-color: var(--pico-muted-background-color); }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <article>
+        <button class="secondary outline" onclick="goBackToUserView()" style="position: absolute; top: 1rem; right: 1rem;">← Back</button>
+        
+        <h2 style="text-align: center;">Live Equipment Status</h2>
+        <p style="text-align: center;"><small>You can click on any <strong>available</strong> EPJ to select it.</small></p>
+
+        <div class="overflow-auto">
+          <table id="statusTable">
+            <thead>
+              <tr>
+                <th>EPJ</th>
+                <th>Status</th>
+                <th>Last Known Location</th>
+              </tr>
+            </thead>
+            <tbody>
+              </tbody>
+          </table>
+        </div>
+      </article>
+    </main>
+    <script>
+      const equipmentData = JSON.parse('<?!= equipmentData; ?>');
+      const tableBody = document.querySelector('#statusTable tbody');
+      
+      let tableHtml = '';
+      
+      equipmentData.forEach(item => {
+        let statusClass = '';
+        let rowAttributes = ''; // To hold onclick and style attributes
+
+        if (item.status === 'Available') {
+          statusClass = 'status-available';
+          // Make the row clickable and call the new function in Index.html
+          rowAttributes = `class="clickable-row" onclick="selectEpjAndGoBack('${item.epj}')" title="Click to select EPJ ${item.epj}"`;
+        } else if (item.status === 'Checked Out') {
+          statusClass = 'status-checked-out';
+        } else if (item.status === 'Maintenance') {
+          statusClass = 'status-maintenance';
+        }
+
+        tableHtml += `
+          <tr ${rowAttributes}>
+            <td><strong>${item.epj}</strong></td>
+            <td class="${statusClass}">${item.status}</td>
+            <td>${item.location}</td>
+          </tr>
+        `;
+      });
+
+      tableBody.innerHTML = tableHtml;
+    </script>
+  </body>
+</html>

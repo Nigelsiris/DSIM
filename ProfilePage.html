@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style> main { max-width: 600px; margin: 2rem auto; } </style>
+</head>
+<body>
+    <main class="container">
+        <article>
+            <h2>My Profile</h2>
+            <p>Welcome, <b><?!= username; ?></b>. Use this page to change your password.</p>
+            
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" required>
+            
+            <label for="newPassword">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" required>
+
+            <label for="confirmPassword">Confirm New Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required>
+
+            <button id="changePasswordButton">Change Password</button>
+            <p id="feedback" style="text-align:center; min-height:20px;"></p>
+        </article>
+        
+        <button class="secondary outline" onclick="(function() { const token = localStorage.getItem('sessionToken'); google.script.run.withSuccessHandler(loadView).getUserView(token); })()" style="margin-top: 1rem;">Back to Main Screen</button>
+
+    </main>
+    <script>
+        document.getElementById('changePasswordButton').addEventListener('click', () => {
+            const currentPass = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            const feedback = document.getElementById('feedback');
+
+            if (!currentPass || !newPass || !confirmPass) {
+                feedback.innerText = 'All fields are required.';
+                return;
+            }
+            if (newPass !== confirmPass) {
+                feedback.innerText = 'New passwords do not match.';
+                return;
+            }
+
+            feedback.innerText = 'Updating password...';
+            const token = localStorage.getItem('sessionToken');
+            google.script.run
+                .withSuccessHandler(message => {
+                    feedback.innerText = message;
+                    // Clear fields on success
+                    if (message.includes('successfully')) {
+                        document.getElementById('currentPassword').value = '';
+                        document.getElementById('newPassword').value = '';
+                        document.getElementById('confirmPassword').value = '';
+                    }
+                })
+                .driverChangePassword({
+                    token: token,
+                    currentPassword: currentPass,
+                    newPassword: newPass
+                });
+        });
+    </script>
+</body>
+</html>

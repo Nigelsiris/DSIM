@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  </head>
+  <body>
+    <div style="padding: 20px;">
+      <h2>Driver Sign-In</h2>
+      <div class="block">
+        <label for="driverName">Driver Name</label>
+        <input type="text" id="driverName" name="driverName" required>
+      </div>
+       <div class="block">
+        <label for="truckNumber">Tractor Number</label>
+        <input type="text" id="truckNumber" name="truckNumber" required>
+      </div>
+       <div class="block">
+        <label for="trailerNumber">Trailer Number</label>
+        <input type="text" id="trailerNumber" name="trailerNumber" required>
+      </div>
+      <div class="block">
+        <label for="route">Route</label>
+        <input type="text" id="route" name="route" required>
+      </div>
+      <div class="block">
+        <label for="epjNumber">Available EPJ Number</label>
+        <select id="epjNumber" name="epjNumber" required>
+          <?!= availableEpjsOptions; ?>
+        </select>
+      </div>
+      <br>
+      <button class="action" id="submitButton">Submit Sign-In</button>
+      <div id="message" style="margin-top: 10px;"></div>
+    </div>
+    <script>
+      document.getElementById("submitButton").addEventListener("click", function() {
+        var formData = {
+          driverName: document.getElementById("driverName").value,
+          truckNumber: document.getElementById("truckNumber").value,
+          trailerNumber: document.getElementById("trailerNumber").value,
+          route: document.getElementById("route").value,
+          epjNumber: document.getElementById("epjNumber").value
+        };
+
+        // Basic validation
+        if (!formData.driverName || !formData.truckNumber || !formData.trailerNumber || !formData.route || !formData.epjNumber) {
+          document.getElementById("message").innerText = "Please fill out all fields.";
+          return;
+        }
+
+        document.getElementById("message").innerText = "Processing...";
+        google.script.run.withSuccessHandler(function(response) {
+           document.getElementById("message").innerHTML = '<h3 style="color:green;">Success!</h3><p>You can now close this window.</p>';
+           document.getElementById("submitButton").disabled = true;
+        }).processSignIn(formData);
+      });
+    </script>
+  </body>
+</html>

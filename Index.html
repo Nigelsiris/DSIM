@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+      body, html { margin: 0; padding: 0; }
+      #loader { display: flex; justify-content: center; align-items: center; height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="loader">
+      <article aria-busy="true" style="width: 200px; text-align: center;">Loading...</article>
+    </div>
+    <div id="content" style="display: none;"></div>
+
+    <script>
+      let sessionToken = null;
+      let preselectedEpj = null;
+      // NEW: A variable to hold the admin dashboard's auto-refresh timer.
+      let dashboardRefreshTimer = null;
+
+      window.addEventListener('load', function() {
+        const persistentToken = localStorage.getItem('sessionToken');
+        if (persistentToken) {
+          sessionToken = persistentToken;
+          google.script.run.withSuccessHandler(loadView).getUserView(sessionToken);
+        } else {
+          google.script.run.withSuccessHandler(loadView).getLoginPageHtml();
+        }
+      });
+
+      function handleLoginSuccess(sessionData) {
+        if (sessionData && sessionData.token) {
+          sessionToken = sessionData.token;
+          if (sessionData.role === 'Admin' || sessionData.role === 'Load Support') {
+              localStorage.setItem('sessionToken', sessionData.token);
+          }
+          google.script.run.withSuccessHandler(loadView).getUserView(sessionToken);
+        }
+      }
+
+      function loadView(html) {
+        // NEW: Before loading any new view, clear the admin auto-refresh timer if it exists.
+        if (dashboardRefreshTimer) {
+          clearInterval(dashboardRefreshTimer);
+          dashboardRefreshTimer = null;
+        }
+
+        if (!html) {
+          logout();
+          return;
+        }
+
+        // If the server returned the login page HTML, render it but clear
+        // persistent session state so the login page doesn't immediately
+        // re-authenticate. Instead of reloading the whole page (which caused
+        // blank/white screens and reload loops), inject the login scripts into an
+        // isolated function scope to avoid redeclaring globals.
+        const looksLikeLogin = html.indexOf('id="loginButton"') !== -1 || html.indexOf('System Login') !== -1;
+        if (looksLikeLogin) {
+          // Clear persistent token so we don't auto-login.
+          sessionToken = null;
+          try { localStorage.removeItem('sessionToken'); } catch (e) { /* ignore */ }
+        }
+
+        const contentDiv = document.getElementById('content');
+        contentDiv.innerHTML = html;
+
+        if (preselectedEpj) {
+          const epjDropdown = contentDiv.querySelector('#epjNumber');
+          if (epjDropdown) {
+            epjDropdown.value = preselectedEpj;
+            epjDropdown.dispatchEvent(new Event('change'));
+          }
+          preselectedEpj = null;
+        }
+
+        // Execute inline scripts in an isolated IIFE to avoid polluting the
+        // global scope and to prevent duplicate-declaration errors when views are
+        // swapped repeatedly.
+        const scripts = contentDiv.getElementsByTagName('script');
+        for (let i = 0; i < scripts.length; i++) {
+          const code = scripts[i].innerText || '';
+          if (!code.trim()) continue;
+          try {
+            // Run the code inside a new function to create a local scope.
+            // We intentionally do not expose any globals and catch errors to
+            // avoid breaking the app if a script throws.
+            (new Function('(function(){\n' + code + '\n})();'))();
+          } catch (e) {
+            // If executing isolated code fails, fall back to appending the
+            // script into the document so existing behavior is preserved.
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.innerText = code;
+            document.body.appendChild(script).parentNode.removeChild(script);
+          }
+        }
+        
+        document.getElementById('loader').style.display = 'none';
+        contentDiv.style.display = 'block';
+      }
+
+      function logout() {
+        // NEW: Make sure to clear the timer on logout as well.
+        if (dashboardRefreshTimer) {
+          clearInterval(dashboardRefreshTimer);
+          dashboardRefreshTimer = null;
+        }
+        if (sessionToken) {
+          google.script.run.logoutUser({token: sessionToken});
+          sessionToken = null;
+        }
+        localStorage.removeItem('sessionToken');
+        google.script.run.withSuccessHandler(loadView).getLoginPageHtml();
+      }
+
+      function loadProfilePage() {
+        if (sessionToken) {
+          google.script.run.withSuccessHandler(loadView).getProfilePageHtml(sessionToken);
+        } else {
+          logout();
+        }
+      }
+
+      function loadEquipmentStatusPage() {
+        if (sessionToken) {
+          google.script.run
+            .withFailureHandler(function(error) {
+              alert('An error occurred: ' + error.message);
+              logout();
+            })
+            .withSuccessHandler(loadView)
+            .getEquipmentStatusPageHtml(sessionToken);
+        } else {
+          logout();
+        }
+      }
+      
+      function goBackToUserView() {
+        if (sessionToken) {
+          google.script.run.withSuccessHandler(loadView).getUserView(sessionToken);
+        } else {
+          logout();
+        }
+      }
+
+      function selectEpjAndGoBack(epjNumber) {
+        preselectedEpj = epjNumber;
+        goBackToUserView();
+      }
+    </script>
+  </body>
+</html>

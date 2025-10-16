@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        main { max-width: 500px; margin: 2rem auto; }
+        #quickLogin { margin-top: 1.5rem; text-align: center; }
+        #quickLogin h5 { margin-bottom: 0.5rem; }
+        #quickLogin .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <article>
+            <div style="text-align: center;">
+                <h2>System Login</h2>
+            </div>
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="off">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password">
+            <button id="loginButton" style="width:100%;">Login</button>
+            <p id="feedback" style="text-align:center; min-height:20px;"></p>
+        </article>
+
+        <? if (activeDrivers && activeDrivers.length > 0) { ?>
+        <section id="quickLogin">
+            <h5>Quick Login for Check-In:</h5>
+            <div class="grid">
+                <? for (var i = 0; i < activeDrivers.length; i++) { ?>
+                    <button class="secondary outline" onclick="prefillLogin('<?= activeDrivers[i].username ?>')">
+                        <?= activeDrivers[i].displayName ?>
+                    </button>
+                <? } ?>
+            </div>
+        </section>
+        <? } ?>
+    </main>
+
+    <script>
+        // Immediately-invoked Function Expression (IIFE) to create a private scope
+        // This prevents functions from being declared in global scope and avoids
+        // "already declared" errors if this script is loaded multiple times
+        (function() {
+            // Define all functions within this private scope
+            const attemptLogin = function() {
+                document.getElementById("loginButton").setAttribute("aria-busy", "true");
+                document.getElementById("feedback").innerText = "Requesting location...";
+                
+                // 1. Try to get geolocation
+                navigator.geolocation.getCurrentPosition(
+                    // Success callback: location was received
+                    function(position) {
+                        const coords = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        };
+                        proceedWithLogin(coords);
+                    },
+                    // Error callback: location was denied or unavailable
+                    function(error) {
+                        console.error("Geolocation error: " + error.message);
+                        // Proceed with login but without coordinates
+                        proceedWithLogin(null);
+                    }
+                );
+            };
+
+            const proceedWithLogin = function(coords) {
+                document.getElementById("feedback").innerText = "Authenticating...";
+                const user = document.getElementById("username").value;
+                const pass = document.getElementById("password").value;
+                
+                const loginData = {
+                    username: user,
+                    password: pass,
+                    latitude: coords ? coords.latitude : null,
+                    longitude: coords ? coords.longitude : null
+                };
+
+                google.script.run.withSuccessHandler(onLoginSuccess).loginAndGetUserView(loginData);
+            };
+
+            const onLoginSuccess = function(sessionData) {
+                document.getElementById("loginButton").removeAttribute("aria-busy");
+                if (sessionData && sessionData.token) {
+                    if (sessionData.role === 'Admin' || sessionData.role === 'Load Support') {
+                        localStorage.setItem('sessionToken', sessionData.token);
+                    }
+                    // Call the parent window's handleLoginSuccess function
+                    // This is defined in the main page, not in this script
+                    window.handleLoginSuccess(sessionData);
+                } else {
+                    document.getElementById("feedback").innerText = "Invalid username or password.";
+                }
+            };
+            
+            // Expose prefillLogin globally for inline click handlers in buttons
+            // but prefix with "login_" to avoid potential collisions
+            window.prefillLogin = function(username) {
+                document.getElementById('username').value = username;
+                document.getElementById('password').focus();
+            };
+
+            // Set up event listeners
+            const loginButton = document.getElementById("loginButton");
+            if (loginButton) {
+                loginButton.addEventListener("click", attemptLogin);
+            }
+        })(); // End IIFE
+    </script>
+</body>
+</html>

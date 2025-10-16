@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style> main { padding: 20px; } </style>
+</head>
+<body>
+    <main class="container">
+        <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
+            <button class="contrast" onclick="logout()">Logout</button>
+            <button onclick="goBack()">Back to Dashboard</button>
+        </div>
+        <h1 style="text-align:center;">User Management</h1>
+        <div class="overflow-auto">
+            <table id="userTable">
+                <thead><tr><th>Username</th><th>Role</th><th>Carrier</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <p id="feedback" style="text-align:center; min-height: 20px;"></p>
+    </main>
+    <script>
+        sessionToken = "<?= token ?>";
+        function logout() {
+            google.script.run.withSuccessHandler(() => {
+                document.querySelector('main').innerHTML = '<h1>You have been logged out.</h1>';
+            }).logoutUser({token: sessionToken});
+        }
+        function goBack() {
+            google.script.run.withSuccessHandler(function(html) {
+                document.open(); document.write(html); document.close();
+            }).getAdminPageHtml(sessionToken);
+        }
+        function loadUsers() {
+            document.getElementById('feedback').innerText = 'Loading users...';
+            google.script.run.withSuccessHandler(populateUsers).withFailureHandler(function(err) {
+                document.getElementById('feedback').innerText = 'Error loading users: ' + err.message;
+            }).getAllUsers({token: sessionToken});
+        }
+        function populateUsers(users) {
+            const userTableBody = document.querySelector('#userTable tbody');
+            userTableBody.innerHTML = '';
+            users.forEach(user => {
+                userTableBody.innerHTML += `<tr><td>${user.username}</td><td>${user.role}</td><td>${user.carrier}</td><td><button class="secondary" onclick="editUser('${user.username}', '${user.role}', '${user.carrier || ''}')">Edit</button> <button class="secondary outline" onclick="resetPassword('${user.username}')">Reset Pass</button> <button class="contrast outline" onclick="deleteUser('${user.username}')">Delete</button></td></tr>`;
+            });
+            document.getElementById('feedback').innerText = '';
+        }
+        function editUser(username, currentRole, currentCarrier) {
+            const newRole = prompt(`Enter new role for "${username}": (Current: ${currentRole})`, currentRole);
+            if (newRole === null) return;
+            const newCarrier = prompt(`Enter new carrier for "${username}": (Current: ${currentCarrier})`, currentCarrier);
+            if (newCarrier !== null) {
+                google.script.run.withSuccessHandler(loadUsers).adminEditUser({token: sessionToken, username: username, role: newRole, carrier: newCarrier});
+            }
+        }
+        function resetPassword(username) {
+            const newPassword = prompt(`Enter a new password for user "${username}":`);
+            if (newPassword) {
+                google.script.run.withSuccessHandler(loadUsers).adminResetPassword({token: sessionToken, username: username, newPassword: newPassword});
+            }
+        }
+        function deleteUser(username) {
+            if (confirm(`Are you sure you want to permanently delete user "${username}"?`)) {
+                google.script.run.withSuccessHandler(loadUsers).adminDeleteUser({token: sessionToken, username: username});
+            }
+        }
+        loadUsers();
+    </script>
+</body>
+</html>
