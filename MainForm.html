@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html>
   <head>
-  <base target="_top">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-  <?!= include('SharedStyles'); ?>
-  <?!= include('AppShellStyles'); ?>
+    <base target="_top">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
   </head>
   <body>
-  <div id="topRightControls" class="top-controls"></div>
-  <div style="padding: 20px;">
+    <div style="padding: 20px;">
       <h2>Driver Sign-In</h2>
       <div class="block">
         <label for="driverName">Driver Name</label>
@@ -34,100 +31,30 @@
       </div>
       <br>
       <button class="action" id="submitButton">Submit Sign-In</button>
-      <button class="secondary" id="clearSavedInfoButton" type="button">Clear Saved Info</button>
       <div id="message" style="margin-top: 10px;"></div>
     </div>
-    <div class="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
-    <?!= include('AppShellScript'); ?>
     <script>
-      const FORM_STORAGE_KEY = 'dsim_main_form_data';
-      const app = AppShell.init();
-
-      const formFields = app.persistFields(FORM_STORAGE_KEY, {
-        driverName: '#driverName',
-        truckNumber: {
-          selector: '#truckNumber',
-          transform: {
-            save: (value) => app.sanitize(value).toUpperCase(),
-            write: (el, value) => { el.value = value || ''; }
-          }
-        },
-        trailerNumber: {
-          selector: '#trailerNumber',
-          transform: {
-            save: (value) => app.sanitize(value).toUpperCase(),
-            write: (el, value) => { el.value = value || ''; }
-          }
-        },
-        route: '#route',
-        epjNumber: {
-          selector: '#epjNumber',
-          transform: {
-            write: (el, value) => {
-              if (!value) {
-                el.selectedIndex = 0;
-                return;
-              }
-              const option = Array.from(el.options).find(opt => opt.value === value);
-              if (option) {
-                el.value = value;
-              }
-            }
-          }
-        }
-      });
-
-      app.forceUppercase('#truckNumber');
-      app.forceUppercase('#trailerNumber');
-
-      document.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'Enter') {
-          document.getElementById('submitButton').click();
-        }
-      });
-
-      document.getElementById('clearSavedInfoButton').addEventListener('click', () => {
-        formFields.clear();
-        app.toast('Saved info cleared.');
-      });
-
-      document.getElementById('submitButton').addEventListener('click', function() {
-        const formData = {
-          driverName: document.getElementById('driverName').value,
-          truckNumber: document.getElementById('truckNumber').value,
-          trailerNumber: document.getElementById('trailerNumber').value,
-          route: document.getElementById('route').value,
-          epjNumber: document.getElementById('epjNumber').value
+      document.getElementById("submitButton").addEventListener("click", function() {
+        var formData = {
+          driverName: document.getElementById("driverName").value,
+          truckNumber: document.getElementById("truckNumber").value,
+          trailerNumber: document.getElementById("trailerNumber").value,
+          route: document.getElementById("route").value,
+          epjNumber: document.getElementById("epjNumber").value
         };
 
+        // Basic validation
         if (!formData.driverName || !formData.truckNumber || !formData.trailerNumber || !formData.route || !formData.epjNumber) {
-          document.getElementById('message').innerText = 'Please fill out all fields.';
-          app.toast('Please fill out all fields.', { variant: 'error' });
+          document.getElementById("message").innerText = "Please fill out all fields.";
           return;
         }
 
-        document.getElementById('message').innerText = 'Processing...';
-        app.showLoading();
-
-        google.script.run
-          .withSuccessHandler(function(response) {
-            document.getElementById('message').innerHTML = '<h3 style="color:green;">Success!</h3><p>You can now close this window.</p>';
-            document.getElementById('submitButton').disabled = true;
-            app.hideLoading();
-            app.toast('Sign-in successful!');
-            formFields.clear();
-          })
-          .withFailureHandler(function(err) {
-            document.getElementById('message').innerText = 'Error: ' + (err.message || 'Sign-in failed.');
-            app.hideLoading();
-            app.toast('Sign-in failed.', { variant: 'error' });
-          })
-          .processSignIn(formData);
+        document.getElementById("message").innerText = "Processing...";
+        google.script.run.withSuccessHandler(function(response) {
+           document.getElementById("message").innerHTML = '<h3 style="color:green;">Success!</h3><p>You can now close this window.</p>';
+           document.getElementById("submitButton").disabled = true;
+        }).processSignIn(formData);
       });
-
     </script>
   </body>
 </html>

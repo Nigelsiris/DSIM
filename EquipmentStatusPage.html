@@ -3,8 +3,6 @@
   <head>
     <base target="_top">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-    <?!= include('SharedStyles'); ?>
-    <?!= include('AppShellStyles'); ?>
     <style>
       main { max-width: 900px; margin: 2rem auto; }
       .status-available { color: var(--pico-color-green-500); }
@@ -15,11 +13,9 @@
     </style>
   </head>
   <body>
-    <div id="topRightControls" class="top-controls">
-      <button class="secondary outline" onclick="goBackToUserView()">← Back</button>
-    </div>
     <main class="container">
       <article>
+        <button class="secondary outline" onclick="goBackToUserView()" style="position: absolute; top: 1rem; right: 1rem;">← Back</button>
         
         <h2 style="text-align: center;">Live Equipment Status</h2>
         <p style="text-align: center;"><small>You can click on any <strong>available</strong> EPJ to select it.</small></p>
@@ -39,11 +35,7 @@
         </div>
       </article>
     </main>
-    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
-
-    <?!= include('AppShellScript'); ?>
     <script>
-      AppShell.init();
       const equipmentData = JSON.parse('<?!= equipmentData; ?>');
       const tableBody = document.querySelector('#statusTable tbody');
       

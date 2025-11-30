@@ -2,24 +2,7 @@
 <html>
 <head>
     <base target="_top">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-    <?!= include('SharedStyles'); ?>
-    <?!= include('AppShellStyles'); ?>
     <style>
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(0, 0, 0, 0.1);
-            border-radius: 50%;
-            border-top-color: #1095c1;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 8px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
         main { max-width: 500px; margin: 2rem auto; }
         #quickLogin { margin-top: 1.5rem; text-align: center; }
         #quickLogin h5 { margin-bottom: 0.5rem; }
@@ -27,9 +10,7 @@
     </style>
 </head>
 <body>
-    <div id="topRightControls" class="top-controls"></div>
     <main class="container">
-
         <article>
             <div style="text-align: center;">
                 <h2>System Login</h2>
@@ -39,104 +20,91 @@
             <label for="password">Password</label>
             <input type="password" id="password" name="password">
             <button id="loginButton" style="width:100%;">Login</button>
-            <div class="progress-bar" id="loginProgress">
-                <div class="fill"></div>
-            </div>
-            <div class="login-feedback">
-                <div class="spinner" style="display: none;"></div>
-                <p id="feedback" style="margin: 0;"></p>
-            </div>
+            <p id="feedback" style="text-align:center; min-height:20px;"></p>
         </article>
 
-        <? if (activeDrivers && activeDrivers.length > 0) { ?>
-        <section id="quickLogin">
+        <section id="quickLogin" style="display:none; margin-top: 1.5rem; text-align: center;">
             <h5>Quick Login for Check-In:</h5>
-            <div class="grid">
-                <? for (var i = 0; i < activeDrivers.length; i++) { ?>
-                    <button class="secondary outline quick-login-button" onclick="prefillLogin('<?= activeDrivers[i].username ?>')" id="quick-login-<?= i ?>">
-                        <?= activeDrivers[i].displayName ?>
-                    </button>
-                <? } ?>
-            </div>
+            <div class="grid" id="quickLoginButtons"></div>
         </section>
-        <? } ?>
-
-
     </main>
-    <div class="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
 
-    <?!= include('AppShellScript'); ?>
     <script>
-        const app = AppShell.init();
-        // --- Progress bar and spinner helpers ---
-        function updateProgress(step) {
-            const progressBar = document.getElementById("loginProgress");
-            const fill = progressBar.querySelector(".fill");
-            progressBar.style.display = "block";
-            fill.style.width = `${step * 33.33}%`;
-        }
-
-        function showSpinner(show) {
-            const spinner = document.querySelector(".spinner");
-            spinner.style.display = show ? "inline-block" : "none";
-        }
-        // Ensure login button works and Enter key submits
-        document.getElementById("loginButton").addEventListener("click", attemptLogin);
-        document.getElementById("password").addEventListener("keydown", function(e) {
-            if (e.key === "Enter") attemptLogin();
-        });
-
-        function prefillLogin(username) {
-            const buttonId = Array.from(document.querySelectorAll('.quick-login-button')).find(
-                btn => btn.textContent.trim() === username
-            )?.id;
-            if (buttonId) {
-                document.getElementById(buttonId).setAttribute("aria-busy", "true");
+        // Load active drivers asynchronously after page renders
+        google.script.run.withSuccessHandler(function(drivers) {
+            if (drivers && drivers.length > 0) {
+                const quickLoginSection = document.getElementById('quickLogin');
+                const buttonsContainer = document.getElementById('quickLoginButtons');
+                buttonsContainer.innerHTML = '';
+                drivers.forEach(function(driver) {
+                    const btn = document.createElement('button');
+                    btn.className = 'secondary outline';
+                    btn.textContent = driver.displayName;
+                    btn.onclick = function() { prefillLogin(driver.username); };
+                    buttonsContainer.appendChild(btn);
+                });
+                quickLoginSection.style.display = 'block';
             }
-            document.getElementById('username').value = username;
-            document.getElementById('password').focus();
-            setTimeout(() => {
-                if (buttonId) document.getElementById(buttonId).removeAttribute("aria-busy");
-            }, 500);
+        }).getActiveDriverNames();
+
+        document.getElementById("loginButton").addEventListener("click", attemptLogin);
+
+        function attemptLogin() {
+            document.getElementById("loginButton").setAttribute("aria-busy", "true");
+            document.getElementById("feedback").innerText = "Authenticating...";
+            
+            let locationReceived = false;
+            
+            // Set a 2-second timeout for geolocation
+            const geoTimeout = setTimeout(function() {
+                if (!locationReceived) {
+                    console.log("Geolocation timeout - proceeding without location");
+                    proceedWithLogin(null);
+                }
+            }, 2000);
+            
+            // Try to get geolocation with timeout option
+            navigator.geolocation.getCurrentPosition(
+                // Success callback: location was received
+                function(position) {
+                    if (!locationReceived) {
+                        locationReceived = true;
+                        clearTimeout(geoTimeout);
+                        const coords = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        };
+                        proceedWithLogin(coords);
+                    }
+                },
+                // Error callback: location was denied or unavailable
+                function(error) {
+                    if (!locationReceived) {
+                        locationReceived = true;
+                        clearTimeout(geoTimeout);
+                        console.error("Geolocation error: " + error.message);
+                        // Proceed with login but without coordinates
+                        proceedWithLogin(null);
+                    }
+                },
+                {
+                    timeout: 2000,
+                    enableHighAccuracy: false // Faster but less accurate
+                }
+            );
         }
-        async function attemptLogin() {
-            const loginButton = document.getElementById("loginButton");
-            const feedback = document.getElementById("feedback");
 
-            loginButton.setAttribute("aria-busy", "true");
-            showSpinner(true);
-            app.showLoading();
-            document.getElementById("loginProgress").style.display = "block";
-            updateProgress(1);
-            feedback.innerText = "Initializing login...";
-
+        function proceedWithLogin(coords) {
+            document.getElementById("feedback").innerText = "Authenticating...";
             const user = document.getElementById("username").value;
             const pass = document.getElementById("password").value;
-
-            // Start location request and authentication in parallel
-            const locationPromise = new Promise((resolve) => {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => resolve({
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude
-                    }),
-                    () => resolve(null),
-                    { timeout: 5000 } // 5 second timeout
-                );
-            });
-
-            updateProgress(2);
-            feedback.innerText = "Processing...";
-
-            // Wait for location (with timeout) and proceed with login
-            const coords = await locationPromise;
             
-            updateProgress(3);
-            feedback.innerText = "Authenticating...";
-
+            if (!user || !pass) {
+                document.getElementById("loginButton").removeAttribute("aria-busy");
+                document.getElementById("feedback").innerText = "Please enter username and password.";
+                return;
+            }
+            
             const loginData = {
                 username: user,
                 password: pass,
@@ -145,45 +113,39 @@
             };
 
             google.script.run
-                .withSuccessHandler(function(data) { onLoginSuccess(data); app.hideLoading(); })
-                .withFailureHandler(function(err) { onLoginFailure(err); app.hideLoading(); app.toast('Login failed', { variant: 'error' }); })
+                .withSuccessHandler(onLoginSuccess)
+                .withFailureHandler(function(error) {
+                    document.getElementById("loginButton").removeAttribute("aria-busy");
+                    document.getElementById("feedback").innerText = "Login error: " + error.message;
+                })
                 .loginAndGetUserView(loginData);
         }
 
-        function onLoginFailure(error) {
-            const loginButton = document.getElementById("loginButton");
-            const feedback = document.getElementById("feedback");
-            const progressBar = document.getElementById("loginProgress");
-            
-            loginButton.removeAttribute("aria-busy");
-            showSpinner(false);
-            progressBar.style.display = "none";
-            feedback.innerText = "Login failed. Please try again.";
-            app.toast('Login failed. Please try again.', { variant: 'error' });
-        }
-
         function onLoginSuccess(sessionData) {
-            const loginButton = document.getElementById("loginButton");
-            const feedback = document.getElementById("feedback");
-            const progressBar = document.getElementById("loginProgress");
-            
-            loginButton.removeAttribute("aria-busy");
-            showSpinner(false);
-            progressBar.style.display = "none";
+            document.getElementById("loginButton").removeAttribute("aria-busy");
             if (sessionData && sessionData.token) {
                 if (sessionData.role === 'Admin' || sessionData.role === 'Load Support') {
                     localStorage.setItem('sessionToken', sessionData.token);
                 }
-                feedback.innerText = "Login successful!";
-                app.toast('Login successful!');
-                handleLoginSuccess(sessionData);
+                document.getElementById("feedback").innerText = "Login successful! Loading...";
+                // Call parent window's handleLoginSuccess function
+                if (window.parent && window.parent.handleLoginSuccess) {
+                    window.parent.handleLoginSuccess(sessionData);
+                } else if (window.handleLoginSuccess) {
+                    window.handleLoginSuccess(sessionData);
+                } else {
+                    // Fallback: reload to trigger session check
+                    location.reload();
+                }
             } else {
-                feedback.innerText = "Invalid username or password.";
-                app.toast('Invalid username or password.', { variant: 'error' });
+                document.getElementById("feedback").innerText = "Invalid username or password.";
             }
         }
         
-
+        function prefillLogin(username) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').focus();
+        }
     </script>
 </body>
 </html>

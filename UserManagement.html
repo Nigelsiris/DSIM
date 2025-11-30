@@ -3,255 +3,572 @@
 <head>
     <base target="_top">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-    <?!= include('SharedStyles'); ?>
-    <?!= include('AppShellStyles'); ?>
-    <style> main { padding: 20px; } </style>
+    <style>
+        main { padding: 20px; }
+        .user-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-background-color);
+            border: 1px solid var(--primary);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-card h4 {
+            margin: 0;
+            color: var(--primary);
+        }
+        .stat-card p {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0 0 0;
+        }
+        .action-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .action-bar input[type="search"] {
+            flex: 1;
+            min-width: 200px;
+            margin: 0;
+        }
+        .action-bar select {
+            width: auto;
+            margin: 0;
+        }
+        .bulk-actions {
+            background: var(--card-background-color);
+            border: 1px solid var(--muted-border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .bulk-actions.active {
+            display: block;
+        }
+        .table-wrapper {
+            position: relative;
+            overflow-x: auto;
+        }
+        .user-table th {
+            cursor: pointer;
+            user-select: none;
+        }
+        .user-table th:hover {
+            background: var(--table-row-stripped-background-color);
+        }
+        .user-table th.sorted::after {
+            content: ' ▼';
+            font-size: 0.8em;
+        }
+        .user-table th.sorted-asc::after {
+            content: ' ▲';
+            font-size: 0.8em;
+        }
+        .user-row.selected {
+            background: var(--primary-focus);
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .badge-admin { background: #ff6b6b; color: white; }
+        .badge-driver { background: #51cf66; color: white; }
+        .badge-loadsupport { background: #339af0; color: white; }
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .action-buttons button {
+            margin: 0;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+        }
+        #feedback {
+            position: sticky;
+            bottom: 1rem;
+            z-index: 100;
+            background: var(--card-background-color);
+            border: 2px solid var(--primary);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        #feedback.hidden {
+            display: none;
+        }
+        #feedback.error {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+        }
+        #feedback.success {
+            border-color: #51cf66;
+            color: #51cf66;
+        }
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <div id="topRightControls" class="top-controls">
-        <button class="contrast" onclick="logout()">Logout</button>
-        <button onclick="goBack()">Back to Dashboard</button>
-        <!-- Theme toggle will be injected here -->
-    </div>
     <main class="container">
-        <h1 style="text-align:center;">User Management</h1>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
-            <input id="searchInput" type="text" placeholder="Search users..." style="max-width: 250px;">
-            <div id="pagination" style="display: flex; gap: 8px;"></div>
+        <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
+            <button class="contrast" onclick="logout()">Logout</button>
+            <button onclick="goBack()">Back to Dashboard</button>
         </div>
-        <div class="overflow-auto">
-            <table id="userTable">
-                <thead><tr><th>Username</th><th>Role</th><th>Carrier</th><th><input type="checkbox" id="selectAll"></th><th>Actions</th></tr></thead>
-                <tbody></tbody>
+        
+        <h1 style="text-align:center;">👥 User Management</h1>
+        
+        <!-- User Statistics -->
+        <div class="user-stats" id="userStats">
+            <div class="stat-card">
+                <h4>Total Users</h4>
+                <p id="statTotal">0</p>
+            </div>
+            <div class="stat-card">
+                <h4>Admins</h4>
+                <p id="statAdmins">0</p>
+            </div>
+            <div class="stat-card">
+                <h4>Drivers</h4>
+                <p id="statDrivers">0</p>
+            </div>
+            <div class="stat-card">
+                <h4>Load Support</h4>
+                <p id="statLoadSupport">0</p>
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <input type="search" id="searchInput" placeholder="🔍 Search users..." oninput="filterUsers()">
+            <select id="roleFilter" onchange="filterUsers()">
+                <option value="">All Roles</option>
+                <option value="Admin">Admin</option>
+                <option value="Driver">Driver</option>
+                <option value="Load Support">Load Support</option>
+            </select>
+            <select id="carrierFilter" onchange="filterUsers()">
+                <option value="">All Carriers</option>
+            </select>
+            <button onclick="toggleSelectAll()">Select All</button>
+            <button onclick="exportUsers()" class="secondary">📥 Export CSV</button>
+            <button onclick="refreshUsers()" class="secondary outline">🔄 Refresh</button>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="bulk-actions" id="bulkActions">
+            <h4>Bulk Actions (<span id="selectedCount">0</span> selected)</h4>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <select id="bulkRoleChange">
+                    <option value="">Change Role To...</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Driver">Driver</option>
+                    <option value="Load Support">Load Support</option>
+                </select>
+                <button onclick="applyBulkRoleChange()" class="secondary">Apply Role Change</button>
+                <button onclick="bulkDeleteUsers()" class="contrast">🗑️ Delete Selected</button>
+                <button onclick="clearSelection()" class="secondary outline">Clear Selection</button>
+            </div>
+        </div>
+
+        <!-- User Table -->
+        <div class="table-wrapper">
+            <table class="user-table" id="userTable">
+                <thead>
+                    <tr>
+                        <th class="checkbox-cell"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"></th>
+                        <th onclick="sortTable('username')">Username</th>
+                        <th onclick="sortTable('role')">Role</th>
+                        <th onclick="sortTable('carrier')">Carrier</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    <!-- Users will be populated here -->
+                </tbody>
             </table>
         </div>
-        <div style="margin-top: 1em;">
-            <button id="bulkDeleteBtn" class="contrast outline" style="display:none;">Delete Selected</button>
-        </div>
-        <p id="feedback" style="text-align:center; min-height: 20px;"></p>
-    </main>
-    <div class="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-    <div id="modal" class="modal-overlay" role="dialog" aria-modal="true">
-        <div id="modalContent" class="modal-content"></div>
-    </div>
-    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
 
-    <?!= include('AppShellScript'); ?>
+        <p id="feedback" class="hidden">Loading users...</p>
+    </main>
+
     <script>
-        const app = AppShell.init();
-        // --- Modal ---
-        function showModal(html, onConfirm, onCancel) {
-            const modal = document.getElementById('modal');
-            const content = document.getElementById('modalContent');
-            content.innerHTML = html + `<div style='margin-top:1em; text-align:right;'><button id='modalOk'>OK</button> <button id='modalCancel'>Cancel</button></div>`;
-            modal.classList.add('is-visible');
-            document.getElementById('modalOk').onclick = () => { modal.classList.remove('is-visible'); if (onConfirm) onConfirm(); };
-            document.getElementById('modalCancel').onclick = () => { modal.classList.remove('is-visible'); if (onCancel) onCancel(); };
-        }
-        // --- Pagination ---
+        sessionToken = "<?= token ?>";
         let allUsers = [];
         let filteredUsers = [];
-        let currentPage = 1;
-        const PAGE_SIZE = 10;
-        // --- Bulk selection ---
         let selectedUsers = new Set();
-        // --- Main logic ---
-        sessionToken = "<?= token ?>";
+        let sortColumn = 'username';
+        let sortAscending = true;
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', function() {
+            showFeedback('Loading users...', 'info');
+            loadUsers();
+        });
+
+        function showFeedback(message, type = 'info') {
+            const feedback = document.getElementById('feedback');
+            if (!feedback) return;
+            
+            feedback.innerText = message;
+            feedback.className = type === 'error' ? 'error' : (type === 'success' ? 'success' : '');
+            feedback.classList.remove('hidden');
+            
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    feedback.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
         function logout() {
-            app.showLoading();
-            google.script.run
-                .withSuccessHandler(() => {
-                    document.querySelector('main').innerHTML = '<h1>You have been logged out.</h1>';
-                    app.hideLoading();
-                })
-                .withFailureHandler(() => { app.hideLoading(); })
-                .logoutUser({token: sessionToken});
+            google.script.run.withSuccessHandler(() => {
+                const main = document.querySelector('main');
+                if (main) main.innerHTML = '<h1>You have been logged out.</h1>';
+            }).logoutUser({token: sessionToken});
         }
+
         function goBack() {
-            app.showLoading();
-            google.script.run
-                .withSuccessHandler(function(html) {
-                    document.open(); document.write(html); document.close();
-                })
-                .withFailureHandler(() => { app.hideLoading(); })
-                .getAdminPageHtml(sessionToken);
+            google.script.run.withSuccessHandler(function(html) {
+                document.open(); 
+                document.write(html); 
+                document.close();
+            }).getAdminPageHtml(sessionToken);
         }
+
         function loadUsers() {
-            app.showLoading();
-            document.getElementById('feedback').innerText = 'Loading users...';
             google.script.run
-                .withSuccessHandler(response => {
-                    allUsers = response;
-                    filteredUsers = allUsers;
-                    currentPage = 1;
-                    renderTable();
-                    app.hideLoading();
-                })
+                .withSuccessHandler(populateUsers)
                 .withFailureHandler(function(err) {
-                    document.getElementById('feedback').innerText = 'Error loading users: ' + err.message;
-                    app.toast('Error loading users', { variant: 'error' });
-                    app.hideLoading();
+                    showFeedback('Error loading users: ' + (err.message || err), 'error');
                 })
                 .getAllUsers({token: sessionToken});
         }
-        function renderTable() {
-            const userTableBody = document.querySelector('#userTable tbody');
-            userTableBody.innerHTML = '';
-            const start = (currentPage-1)*PAGE_SIZE;
-            const pageUsers = filteredUsers.slice(start, start+PAGE_SIZE);
-            pageUsers.forEach(user => {
-                const checked = selectedUsers.has(user.username) ? 'checked' : '';
-                userTableBody.innerHTML += `<tr>
-                    <td>${user.username}</td>
-                    <td><select onchange="inlineEditRole('${user.username}', this.value)" style="min-width:90px;">${['Admin','Driver','Load Support'].map(r=>`<option value='${r}' ${user.role===r?'selected':''}>${r}</option>`).join('')}</select></td>
-                    <td><input type="text" value="${user.carrier||''}" style="min-width:90px;" onchange="inlineEditCarrier('${user.username}', this.value)"></td>
-                    <td><input type="checkbox" class="rowSelect" data-username="${user.username}" ${checked}></td>
-                    <td>
-                        <button class="secondary outline" onclick="resetPassword('${user.username}')" title="Reset Password">🔑</button>
-                        <button class="contrast outline" onclick="deleteUser('${user.username}')" title="Delete">🗑️</button>
+
+        function refreshUsers() {
+            showFeedback('Refreshing users...', 'info');
+            loadUsers();
+        }
+
+        function populateUsers(users) {
+            if (!users || !Array.isArray(users)) {
+                showFeedback('Error: Invalid user data received', 'error');
+                return;
+            }
+
+            allUsers = users;
+            updateStats();
+            updateCarrierFilter();
+            filterUsers();
+            showFeedback(`Loaded ${users.length} users successfully`, 'success');
+        }
+
+        function updateStats() {
+            const stats = {
+                total: allUsers.length,
+                admins: allUsers.filter(u => u.role === 'Admin').length,
+                drivers: allUsers.filter(u => u.role === 'Driver').length,
+                loadSupport: allUsers.filter(u => u.role === 'Load Support').length
+            };
+
+            const statTotal = document.getElementById('statTotal');
+            const statAdmins = document.getElementById('statAdmins');
+            const statDrivers = document.getElementById('statDrivers');
+            const statLoadSupport = document.getElementById('statLoadSupport');
+
+            if (statTotal) statTotal.innerText = stats.total;
+            if (statAdmins) statAdmins.innerText = stats.admins;
+            if (statDrivers) statDrivers.innerText = stats.drivers;
+            if (statLoadSupport) statLoadSupport.innerText = stats.loadSupport;
+        }
+
+        function updateCarrierFilter() {
+            const carriers = [...new Set(allUsers.map(u => u.carrier).filter(c => c))];
+            const carrierFilter = document.getElementById('carrierFilter');
+            if (!carrierFilter) return;
+
+            const currentValue = carrierFilter.value;
+            carrierFilter.innerHTML = '<option value="">All Carriers</option>';
+            carriers.sort().forEach(carrier => {
+                carrierFilter.innerHTML += `<option value="${carrier}">${carrier}</option>`;
+            });
+            carrierFilter.value = currentValue;
+        }
+
+        function filterUsers() {
+            const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+            const roleFilter = document.getElementById('roleFilter')?.value || '';
+            const carrierFilter = document.getElementById('carrierFilter')?.value || '';
+
+            filteredUsers = allUsers.filter(user => {
+                const matchesSearch = !searchTerm || 
+                    user.username.toLowerCase().includes(searchTerm) ||
+                    (user.carrier || '').toLowerCase().includes(searchTerm);
+                const matchesRole = !roleFilter || user.role === roleFilter;
+                const matchesCarrier = !carrierFilter || user.carrier === carrierFilter;
+                return matchesSearch && matchesRole && matchesCarrier;
+            });
+
+            sortUsers();
+            renderUsers();
+        }
+
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortAscending = !sortAscending;
+            } else {
+                sortColumn = column;
+                sortAscending = true;
+            }
+            sortUsers();
+            renderUsers();
+        }
+
+        function sortUsers() {
+            filteredUsers.sort((a, b) => {
+                let aVal = a[sortColumn] || '';
+                let bVal = b[sortColumn] || '';
+                
+                if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+                if (aVal < bVal) return sortAscending ? -1 : 1;
+                if (aVal > bVal) return sortAscending ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('userTableBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (filteredUsers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No users found</td></tr>';
+                return;
+            }
+
+            filteredUsers.forEach(user => {
+                const isSelected = selectedUsers.has(user.username);
+                const roleBadge = getRoleBadge(user.role);
+                
+                const row = document.createElement('tr');
+                row.className = isSelected ? 'user-row selected' : 'user-row';
+                row.innerHTML = `
+                    <td class="checkbox-cell">
+                        <input type="checkbox" 
+                               ${isSelected ? 'checked' : ''} 
+                               onchange="toggleUserSelection('${escapeHtml(user.username)}')">
                     </td>
-                </tr>`;
+                    <td><strong>${escapeHtml(user.username)}</strong></td>
+                    <td>${roleBadge}</td>
+                    <td>${escapeHtml(user.carrier || 'N/A')}</td>
+                    <td class="action-buttons">
+                        <button class="secondary" onclick="editUser('${escapeHtml(user.username)}', '${escapeHtml(user.role)}', '${escapeHtml(user.carrier || '')}')">✏️ Edit</button>
+                        <button class="secondary outline" onclick="resetPassword('${escapeHtml(user.username)}')">🔑 Reset</button>
+                        <button class="contrast outline" onclick="deleteUser('${escapeHtml(user.username)}')">🗑️ Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
             });
-            document.getElementById('feedback').innerText = '';
-            updatePagination();
-            updateBulkDeleteBtn();
-            // Keyboard navigation
-            Array.from(document.querySelectorAll('#userTable input, #userTable select, #userTable button')).forEach(el => {
-                el.onkeydown = function(e) {
-                    if (e.key === 'Enter') e.target.blur();
-                };
-            });
+
+            updateSortIndicators();
         }
-        function updatePagination() {
-            const totalPages = Math.ceil(filteredUsers.length / PAGE_SIZE) || 1;
-            const pagDiv = document.getElementById('pagination');
-            pagDiv.innerHTML = '';
-            for (let i=1; i<=totalPages; i++) {
-                const btn = document.createElement('button');
-                btn.textContent = i;
-                btn.className = i===currentPage ? 'secondary' : '';
-                btn.onclick = () => { currentPage = i; renderTable(); };
-                pagDiv.appendChild(btn);
+
+        function getRoleBadge(role) {
+            const badgeClass = role.toLowerCase().replace(/\s+/g, '');
+            return `<span class="badge badge-${badgeClass}">${escapeHtml(role)}</span>`;
+        }
+
+        function updateSortIndicators() {
+            document.querySelectorAll('.user-table th').forEach(th => {
+                th.classList.remove('sorted', 'sorted-asc');
+            });
+
+            const headers = document.querySelectorAll('.user-table th');
+            const columnIndex = ['username', 'role', 'carrier'].indexOf(sortColumn);
+            if (columnIndex >= 0 && headers[columnIndex + 1]) {
+                headers[columnIndex + 1].classList.add(sortAscending ? 'sorted-asc' : 'sorted');
             }
         }
-        function updateBulkDeleteBtn() {
-            const btn = document.getElementById('bulkDeleteBtn');
-            btn.style.display = selectedUsers.size > 0 ? '' : 'none';
+
+        function toggleUserSelection(username) {
+            if (selectedUsers.has(username)) {
+                selectedUsers.delete(username);
+            } else {
+                selectedUsers.add(username);
+            }
+            updateBulkActions();
+            renderUsers();
         }
-        // --- Inline editing ---
-        function inlineEditRole(username, newRole) {
-            app.showLoading();
-            google.script.run
-                .withSuccessHandler(() => {
-                    app.toast('Role updated');
-                    loadUsers();
-                })
-                .withFailureHandler(err => {
-                    app.toast('Error updating role', { variant: 'error' });
-                    app.hideLoading();
-                })
-                .adminEditUser({token: sessionToken, username, role: newRole, carrier: getCarrier(username)});
+
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            
+            if (selectAllCheckbox && selectAllCheckbox.checked) {
+                filteredUsers.forEach(user => selectedUsers.add(user.username));
+            } else {
+                selectedUsers.clear();
+            }
+            
+            updateBulkActions();
+            renderUsers();
         }
-        function inlineEditCarrier(username, newCarrier) {
-            app.showLoading();
-            google.script.run
-                .withSuccessHandler(() => {
-                    app.toast('Carrier updated');
-                    loadUsers();
-                })
-                .withFailureHandler(err => {
-                    app.toast('Error updating carrier', { variant: 'error' });
-                    app.hideLoading();
-                })
-                .adminEditUser({token: sessionToken, username, role: getRole(username), carrier: newCarrier});
+
+        function clearSelection() {
+            selectedUsers.clear();
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            updateBulkActions();
+            renderUsers();
         }
-        function getRole(username) {
-            const row = Array.from(document.querySelectorAll('#userTable tbody tr')).find(tr => tr.cells[0].textContent === username);
-            return row ? row.querySelector('select').value : '';
+
+        function updateBulkActions() {
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (selectedCount) selectedCount.innerText = selectedUsers.size;
+            
+            if (bulkActions) {
+                if (selectedUsers.size > 0) {
+                    bulkActions.classList.add('active');
+                } else {
+                    bulkActions.classList.remove('active');
+                }
+            }
         }
-        function getCarrier(username) {
-            const row = Array.from(document.querySelectorAll('#userTable tbody tr')).find(tr => tr.cells[0].textContent === username);
-            return row ? row.querySelector('input[type=text]').value : '';
+
+        function editUser(username, currentRole, currentCarrier) {
+            const newRole = prompt(`Enter new role for "${username}": (Current: ${currentRole})`, currentRole);
+            if (newRole === null) return;
+            const newCarrier = prompt(`Enter new carrier for "${username}": (Current: ${currentCarrier})`, currentCarrier);
+            if (newCarrier !== null) {
+                showFeedback('Updating user...', 'info');
+                google.script.run
+                    .withSuccessHandler(() => {
+                        showFeedback(`User "${username}" updated successfully`, 'success');
+                        loadUsers();
+                    })
+                    .withFailureHandler(err => showFeedback('Error: ' + (err.message || err), 'error'))
+                    .adminEditUser({token: sessionToken, username: username, role: newRole, carrier: newCarrier});
+            }
         }
-        // --- Reset password ---
+
         function resetPassword(username) {
-            showModal(`Enter a new password for <b>${username}</b>:<br><input type='password' id='newPassInput' style='width:100%;margin-top:0.5em;'>`, function() {
-                const newPassword = document.getElementById('newPassInput').value;
-                if (!newPassword) { app.toast('Password required', { variant: 'error' }); return; }
-                app.showLoading();
+            const newPassword = prompt(`Enter a new password for user "${username}":`);
+            if (newPassword) {
+                showFeedback('Resetting password...', 'info');
                 google.script.run
-                    .withSuccessHandler(() => { app.toast('Password reset'); loadUsers(); })
-                    .withFailureHandler(err => { app.toast('Error resetting password', { variant: 'error' }); app.hideLoading(); })
-                    .adminResetPassword({token: sessionToken, username, newPassword});
-            });
+                    .withSuccessHandler(() => {
+                        showFeedback(`Password reset for "${username}"`, 'success');
+                        loadUsers();
+                    })
+                    .withFailureHandler(err => showFeedback('Error: ' + (err.message || err), 'error'))
+                    .adminResetPassword({token: sessionToken, username: username, newPassword: newPassword});
+            }
         }
-        // --- Delete user ---
+
         function deleteUser(username) {
-            showModal(`Are you sure you want to permanently delete <b>${username}</b>?`, function() {
-                app.showLoading();
+            if (confirm(`Are you sure you want to permanently delete user "${username}"?`)) {
+                showFeedback('Deleting user...', 'info');
                 google.script.run
-                    .withSuccessHandler(() => { app.toast('User deleted'); loadUsers(); })
-                    .withFailureHandler(err => { app.toast('Error deleting user', { variant: 'error' }); app.hideLoading(); })
-                    .adminDeleteUser({token: sessionToken, username});
-            });
+                    .withSuccessHandler(() => {
+                        showFeedback(`User "${username}" deleted`, 'success');
+                        selectedUsers.delete(username);
+                        loadUsers();
+                    })
+                    .withFailureHandler(err => showFeedback('Error: ' + (err.message || err), 'error'))
+                    .adminDeleteUser({token: sessionToken, username: username});
+            }
         }
-        // --- Bulk delete ---
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('bulkDeleteBtn').onclick = function() {
-                showModal(`Delete <b>${selectedUsers.size}</b> selected users?`, function() {
-                    app.showLoading();
-                    const users = Array.from(selectedUsers);
-                    let done = 0;
-                    users.forEach(u => {
-                        google.script.run
-                            .withSuccessHandler(() => { if (++done === users.length) { app.toast('Users deleted'); loadUsers(); } })
-                            .withFailureHandler(() => { if (++done === users.length) { app.toast('Users deleted'); loadUsers(); } })
-                            .adminDeleteUser({token: sessionToken, username: u});
-                    });
-                });
-            };
-        });
-        // --- Search/filter ---
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('searchInput').oninput = function(e) {
-                const val = e.target.value.toLowerCase();
-                filteredUsers = allUsers.filter(u =>
-                    u.username.toLowerCase().includes(val) ||
-                    (u.role||'').toLowerCase().includes(val) ||
-                    (u.carrier||'').toLowerCase().includes(val)
-                );
-                currentPage = 1;
-                renderTable();
-            };
-        });
-        // --- Row selection ---
-        document.addEventListener('change', function(e) {
-            if (e.target.classList.contains('rowSelect')) {
-                const username = e.target.getAttribute('data-username');
-                if (e.target.checked) selectedUsers.add(username);
-                else selectedUsers.delete(username);
-                updateBulkDeleteBtn();
+
+        function applyBulkRoleChange() {
+            const newRole = document.getElementById('bulkRoleChange')?.value;
+            if (!newRole) {
+                alert('Please select a role');
+                return;
             }
-            if (e.target.id === 'selectAll') {
-                const check = e.target.checked;
-                document.querySelectorAll('.rowSelect').forEach(cb => {
-                    cb.checked = check;
-                    const username = cb.getAttribute('data-username');
-                    if (check) selectedUsers.add(username);
-                    else selectedUsers.delete(username);
-                });
-                updateBulkDeleteBtn();
+
+            if (selectedUsers.size === 0) {
+                alert('No users selected');
+                return;
             }
-        });
-        // --- Keyboard shortcuts ---
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'f') { document.getElementById('searchInput').focus(); e.preventDefault(); }
-            if (e.key === 'Escape') { document.getElementById('searchInput').value = ''; filteredUsers = allUsers; renderTable(); }
-        });
-        // --- Init ---
-        loadUsers();
+
+            if (confirm(`Change role to "${newRole}" for ${selectedUsers.size} user(s)?`)) {
+                showFeedback(`Updating ${selectedUsers.size} users...`, 'info');
+                google.script.run
+                    .withSuccessHandler(() => {
+                        showFeedback(`Successfully updated ${selectedUsers.size} users`, 'success');
+                        clearSelection();
+                        loadUsers();
+                    })
+                    .withFailureHandler(err => showFeedback('Error: ' + (err.message || err), 'error'))
+                    .adminBulkEditUsers({token: sessionToken, usernames: Array.from(selectedUsers), role: newRole});
+            }
+        }
+
+        function bulkDeleteUsers() {
+            if (selectedUsers.size === 0) {
+                alert('No users selected');
+                return;
+            }
+
+            if (confirm(`Are you sure you want to delete ${selectedUsers.size} user(s)? This cannot be undone!`)) {
+                showFeedback(`Deleting ${selectedUsers.size} users...`, 'info');
+                google.script.run
+                    .withSuccessHandler(() => {
+                        showFeedback(`Successfully deleted ${selectedUsers.size} users`, 'success');
+                        clearSelection();
+                        loadUsers();
+                    })
+                    .withFailureHandler(err => showFeedback('Error: ' + (err.message || err), 'error'))
+                    .adminBulkDeleteUsers({token: sessionToken, usernames: Array.from(selectedUsers)});
+            }
+        }
+
+        function exportUsers() {
+            const csvContent = generateCSV();
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `users_export_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showFeedback('Users exported successfully', 'success');
+        }
+
+        function generateCSV() {
+            let csv = 'Username,Role,Carrier\n';
+            filteredUsers.forEach(user => {
+                csv += `"${user.username}","${user.role}","${user.carrier || ''}"\n`;
+            });
+            return csv;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>

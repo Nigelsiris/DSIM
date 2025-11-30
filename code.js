@@ -30,11 +30,6 @@ const MAINT_LOG_SHEET_NAME = 'Maintenance_Log';
 const ZONES_SHEET_NAME = 'Zones';
 const LOGIN_LOG_SHEET_NAME = 'Login_Log';
 
-// Allow HtmlService templates to inline partial HTML files (styles/scripts).
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
 // --- PASTE YOUR WAREHOUSE COORDINATES HERE ---
 const WAREHOUSE_LAT = 39.58390517747175;
 const WAREHOUSE_LON = -76.02613486224995;
@@ -51,7 +46,7 @@ function doGet(e) {
 // --- UTILITIES ---
 function clearStateCache() {
   const cache = CacheService.getScriptCache();
-  cache.removeAll(['activeTrips', 'epjInfoMap', 'activeDrivers', 'zoneOptions', 'epjStatuses']);
+  cache.removeAll(['activeTrips', 'epjInfoMap', 'activeDrivers', 'zoneOptions', 'epjStatuses', 'activeDriverNames', 'admin_users', 'admin_maintlog']);
 }
 
 function updateAllEpjStatuses() {
@@ -102,8 +97,8 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 // --- PAGE GETTERS ---
 function getLoginPageHtml() {
+  // Don't load activeDrivers here - let the client fetch them asynchronously
   const template = HtmlService.createTemplateFromFile('LoginPage');
-  template.activeDrivers = getActiveDriverNames();
   return template.evaluate().getContent();
 }
 
@@ -121,14 +116,18 @@ function getUserView(token) {
       const template = HtmlService.createTemplateFromFile('CheckInForm');
       template.username = session.username;
       template.tripInfo = activeTrip;
-      template.zoneOptions = getZoneOptions();
+      template.token = token;
+      template.zoneOptions = ''; // Provide empty default for backward compatibility
+      // Don't load zone options here - let client fetch asynchronously
       return template.evaluate().getContent();
     } else {
       const template = HtmlService.createTemplateFromFile('CheckOutForm');
       template.username = session.username;
-      template.availableEpjs = JSON.stringify(getEpjsByStatus('Available'));
-      template.zoneOptions = getZoneOptions();
-      template.epjInfoMap = getEpjInfoMap();
+      template.token = token;
+      template.zoneOptions = ''; // Provide empty default for backward compatibility
+      template.availableEpjs = '[]'; // Provide empty array for backward compatibility
+      template.epjInfoMap = {}; // Provide empty object for backward compatibility
+      // Don't load heavy data here - let client fetch it asynchronously
       return template.evaluate().getContent();
     }
   }
@@ -153,10 +152,8 @@ function getLoadSupportPageHtml(token) {
   if (!session) return null;
   const template = HtmlService.createTemplateFromFile('LoadSupportDashboard');
   template.username = session.username;
-  template.token = token; // Recommended: Do the same for other user roles
-  template.epjStatuses = JSON.stringify(getEpjsByStatus(null, true));
-  template.epjInfoMap = JSON.stringify(getEpjInfoMap());
-  template.zoneOptions = getZoneOptions();
+  template.token = token;
+  // Don't load heavy data here - let client fetch it asynchronously
   return template.evaluate().getContent();
 }
 
@@ -182,32 +179,48 @@ function getEquipmentStatusPageHtml(token) {
 function loginAndGetUserView(loginData) {
   const { username, password, latitude, longitude } = loginData;
   const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
-  const data = userSheet.getRange("A:D").getValues();
+  
+  // Optimize: Only read the columns we need (username, password hash, role)
+  const lastRow = userSheet.getLastRow();
+  if (lastRow < 2) return null; // No users
+  
+  const data = userSheet.getRange(2, 1, lastRow - 1, 3).getValues(); // Only columns A-C
   const passwordHash = sha256(password);
   let user = null;
 
-  for (let i = 1; i < data.length; i++) {
+  for (let i = 0; i < data.length; i++) {
     if (data[i][0] && data[i][0].toLowerCase() === username.toLowerCase() && data[i][1] === passwordHash) {
       user = { username: data[i][0], role: data[i][2] };
       break;
     }
   }
-  const loginLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_LOG_SHEET_NAME);
-  if (loginLogSheet) {
-    let isAtWarehouse = false;
-    if (latitude && longitude) {
-      const distance = calculateDistance(latitude, longitude, WAREHOUSE_LAT, WAREHOUSE_LON);
-      isAtWarehouse = (distance <= GEOFENCE_RADIUS_METERS);
-      loginLogSheet.appendRow([new Date(), username, latitude, longitude, isAtWarehouse]);
-    } else {
-      loginLogSheet.appendRow([new Date(), username, "Not Provided", "Not Provided", false]);
-    }
-  }
+  
   if (!user) return null;
+  
+  // Log login asynchronously AFTER authentication succeeds (don't block response)
+  // Create trigger to log after response is sent
+  try {
+    const loginLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_LOG_SHEET_NAME);
+    if (loginLogSheet) {
+      let isAtWarehouse = false;
+      if (latitude && longitude) {
+        const distance = calculateDistance(latitude, longitude, WAREHOUSE_LAT, WAREHOUSE_LON);
+        isAtWarehouse = (distance <= GEOFENCE_RADIUS_METERS);
+        loginLogSheet.appendRow([new Date(), username, latitude, longitude, isAtWarehouse]);
+      } else {
+        loginLogSheet.appendRow([new Date(), username, "Not Provided", "Not Provided", false]);
+      }
+      SpreadsheetApp.flush(); // Ensure write completes
+    }
+  } catch(e) {
+    // Don't let logging errors block login
+    Logger.log('Login logging error: ' + e);
+  }
+  
   const token = Utilities.getUuid();
   CacheService.getScriptCache().put(token, JSON.stringify(user), 86400);
-  let htmlContent = getUserView(token);
-  return { token: token, role: user.role, html: htmlContent };
+  // Don't generate HTML here - let client fetch it separately for faster login
+  return { token: token, role: user.role };
 }
 
 function getSession(token) {
@@ -473,6 +486,57 @@ function adminEditUser(data) {
   return `Error: User "${data.username}" not found.`;
 }
 
+// --- DATA FETCH FUNCTIONS FOR ASYNC LOADING ---
+function getCheckoutFormData(data) {
+  const session = getSession(data.token);
+  if (!session) throw new Error("Invalid session.");
+  
+  // Get all EPJ statuses with store-only flags
+  const allStatuses = getEpjsByStatus(null, true);
+  const availableEpjs = allStatuses
+    .filter(item => item.status === 'Available')
+    .map(item => ({
+      epj: item.epj,
+      storeOnly: item.storeOnly || false
+    }));
+  
+  return {
+    availableEpjs: availableEpjs,
+    zoneOptions: getZoneOptions(),
+    epjInfoMap: getEpjInfoMap()
+  };
+}
+
+function getCheckinFormData(data) {
+  const session = getSession(data.token);
+  if (!session) throw new Error("Invalid session.");
+  
+  // Check if the current EPJ is store-only
+  let currentEpjIsStoreOnly = false;
+  if (data.epj) {
+    const allStatuses = getEpjsByStatus(null, true);
+    const epjData = allStatuses.find(item => item.epj === data.epj);
+    if (epjData) {
+      currentEpjIsStoreOnly = epjData.storeOnly || false;
+    }
+  }
+  
+  return {
+    zoneOptions: getZoneOptions(),
+    currentEpjIsStoreOnly: currentEpjIsStoreOnly
+  };
+}
+
+function getLoadSupportData(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Load Support') throw new Error("Permission denied.");
+  return {
+    epjStatuses: getEpjsByStatus(null, true),
+    epjInfoMap: getEpjInfoMap(),
+    zoneOptions: getZoneOptions()
+  };
+}
+
 function adminResetPassword(data) {
     const session = getSession(data.token);
     if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
@@ -500,6 +564,56 @@ function adminDeleteUser(data) {
     }
   }
   return `Error: User "${data.username}" not found.`;
+}
+
+// Bulk edit users - change role for multiple users at once
+function adminBulkEditUsers(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const usernames = data.usernames || [];
+  const newRole = data.role;
+  
+  if (!usernames.length) return 'No users selected';
+  if (!newRole) return 'No role specified';
+  
+  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
+  const allUsernames = userSheet.getRange("A:A").getValues();
+  let updatedCount = 0;
+  
+  for (let i = 1; i < allUsernames.length; i++) {
+    if (allUsernames[i][0] && usernames.includes(allUsernames[i][0])) {
+      userSheet.getRange(i + 1, 3).setValue(newRole);
+      updatedCount++;
+    }
+  }
+  
+  CacheService.getScriptCache().remove('admin_users');
+  return `Successfully updated ${updatedCount} user(s) to role "${newRole}".`;
+}
+
+// Bulk delete users
+function adminBulkDeleteUsers(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const usernames = data.usernames || [];
+  if (!usernames.length) return 'No users selected';
+  
+  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
+  const allUsernames = userSheet.getRange("A:A").getValues();
+  let deletedCount = 0;
+  
+  // Delete from bottom to top to avoid row index issues
+  for (let i = allUsernames.length - 1; i > 0; i--) {
+    if (allUsernames[i][0] && usernames.includes(allUsernames[i][0])) {
+      userSheet.deleteRow(i + 1);
+      deletedCount++;
+    }
+  }
+  
+  CacheService.getScriptCache().remove('admin_users');
+  return `Successfully deleted ${deletedCount} user(s).`;
 }
 
 // --- HELPERS & DATA GETTERS ---
@@ -580,12 +694,18 @@ function findActiveTrip(username) {
 }
 
 function getActiveDriverNames() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('activeDriverNames');
+  if (cached != null) { return JSON.parse(cached); }
+  
   const checkouts = getActiveCheckouts();
   const driverMap = new Map();
   checkouts.forEach(trip => {
     driverMap.set(trip.driverUsername, trip.driver);
   });
-  return Array.from(driverMap, ([username, displayName]) => ({ username, displayName }));
+  const result = Array.from(driverMap, ([username, displayName]) => ({ username, displayName }));
+  cache.put('activeDriverNames', JSON.stringify(result), 300); // cache for 5 min
+  return result;
 }
 
 function getZoneOptions() {
@@ -611,12 +731,92 @@ function getEpjsByStatus(status, all = false) {
   } else {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) return [];
-    const values = sheet.getRange("A2:B" + sheet.getLastRow()).getValues();
-    allStatuses = values.map(row => ({epj: row[0], status: row[1]})).filter(item => item.epj);
+    // Updated to include column C for store-only flag
+    const values = sheet.getRange("A2:C" + sheet.getLastRow()).getValues();
+    allStatuses = values.map(row => ({
+      epj: row[0], 
+      status: row[1],
+      storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes'
+    })).filter(item => item.epj);
     cache.put(cacheKey, JSON.stringify(allStatuses), 21600);
   }
   if (all) { return allStatuses; }
   return allStatuses.filter(item => item.status === status).map(item => item.epj);
+}
+
+// Get all EPJs with full details including store-only flag
+function getAllEpjsWithDetails(data) {
+  const session = getSession(data.token);
+  if (!session || (session.role !== 'Admin' && session.role !== 'Load Support')) {
+    throw new Error("Permission denied.");
+  }
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  
+  const values = sheet.getRange("A2:C" + sheet.getLastRow()).getValues();
+  const epjInfoMap = getEpjInfoMap();
+  
+  return values.map(row => ({
+    epj: row[0],
+    status: row[1],
+    storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes',
+    location: epjInfoMap[row[0]] ? epjInfoMap[row[0]].location : 'N/A',
+    fault: epjInfoMap[row[0]] ? epjInfoMap[row[0]].fault : 'No issues reported'
+  })).filter(item => item.epj);
+}
+
+// Quick update EPJ status (for right-click menu)
+function adminQuickUpdateEpjStatus(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const epj = data.epj;
+  const newStatus = data.status;
+  
+  const statusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  const epjList = statusSheet.getRange("A2:A" + statusSheet.getLastRow()).getValues().flat();
+  
+  for (let i = 0; i < epjList.length; i++) {
+    if (epjList[i] === epj) {
+      statusSheet.getRange(i + 2, 2).setValue(newStatus);
+      
+      // Log the status change
+      const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      logSheet.appendRow([
+        '', new Date(), session.username, 'ADMIN', '', '', 
+        epj, '', '', 'Admin Status Override', 
+        `Status changed to ${newStatus}`, '', ''
+      ]);
+      
+      CacheService.getScriptCache().remove('epjStatuses');
+      return `EPJ ${epj} status updated to ${newStatus}`;
+    }
+  }
+  
+  return `Error: EPJ ${epj} not found.`;
+}
+
+// Toggle store-only flag for an EPJ
+function adminToggleStoreOnly(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const epj = data.epj;
+  const storeOnly = data.storeOnly;
+  
+  const statusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  const epjList = statusSheet.getRange("A2:A" + statusSheet.getLastRow()).getValues().flat();
+  
+  for (let i = 0; i < epjList.length; i++) {
+    if (epjList[i] === epj) {
+      statusSheet.getRange(i + 2, 3).setValue(storeOnly);
+      CacheService.getScriptCache().remove('epjStatuses');
+      return `EPJ ${epj} ${storeOnly ? 'marked for' : 'removed from'} store delivery only`;
+    }
+  }
+  
+  return `Error: EPJ ${epj} not found.`;
 }
 
 function getEquipmentStatusViewData() {

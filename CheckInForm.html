@@ -2,32 +2,59 @@
 <html>
 <head>
     <base target="_top">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-    <?!= include('SharedStyles'); ?>
-    <?!= include('AppShellStyles'); ?>
-    <style>
+    <style> 
         main { max-width: 800px; margin: 2rem auto; }
-
-        label input[type="checkbox"] {
-            width: auto;
-            margin-right: 0.75rem;
+        
+        /* Make checkboxes look standard and larger */
+        input[type="checkbox"] {
+            width: 1.25em;
+            height: 1.25em;
+            accent-color: var(--pico-color-green-500, #4caf50);
+            margin-right: 0.5em;
+            vertical-align: middle;
+        }
+        
+        /* Store delivery indicator */
+        .store-only-note {
+            background: #e3f2fd;
+            border-left: 4px solid #1976d2;
+            padding: 0.75rem;
+            margin: 1rem 0;
+            border-radius: 0.25rem;
+            font-size: 0.9rem;
+        }
+        
+        .store-badge {
+            background: #1976d2;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
         }
     </style>
 </head>
 <body>
-    <div id="topRightControls" class="top-controls">
-        <button class="outline" onclick="loadProfilePage()">My Profile</button>
-        <button class="contrast" onclick="logout()">Logout</button>
-    </div>
     <main class="container">
         <article>
+            <div style="position: absolute; top: 1rem; right: 1rem; display: flex; align-items: center; gap: 0.75rem; z-index: 10;">
+                <button class="outline" onclick="loadProfilePage()">My Profile</button>
+                <button class="contrast" onclick="logout()">Logout</button>
+            </div>
             
             <h2>Driver Check-In</h2>
             <p>Welcome back, <b><?!= username; ?></b></p>
             <p>You currently have <b>EPJ <?!= tripInfo.epj; ?></b> checked out.</p>
+            
+            <div id="storeOnlyNotice" style="display: none;" class="store-only-note">
+                🏪 <strong>Store Delivery EPJ:</strong> This EPJ is designated for store deliveries only.
+            </div>
 
             <label for="checkInZone">Final Location of EPJ</label>
-            <select id="checkInZone"><?!= zoneOptions; ?></select>
+            <select id="checkInZone" disabled>
+                <option>Loading zones...</option>
+            </select>
 
             <label for="faultReport">Post-Trip: Report any new issues (optional)</label>
             <textarea id="faultReport" placeholder="e.g., Battery died quickly, makes a grinding noise..."></textarea>
@@ -37,56 +64,91 @@
                 I confirm that the EPJ is plugged in and ready for the next driver.
             </label>
 
-            <button id="checkInBtn" onclick="checkIn()">Complete Check-In</button>
-            <p id="feedback" style="text-align:center; min-height:20px;"></p>
+            <button id="checkInBtn" onclick="checkIn()" disabled>Complete Check-In</button>
+            <p id="feedback" style="text-align:center; min-height:20px;">Loading...</p>
         </article>
     </main>
-    <div class="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-    <div id="toast" class="toast" role="status" aria-live="assertive"></div>
-
-    <?!= include('AppShellScript'); ?>
     <script>
-        const app = AppShell.init();
+        // Robust session token management for kiosk reliability
+        function getSessionToken() {
+            let token = window.sessionToken || localStorage.getItem('sessionToken') || (window.parent && window.parent.sessionToken) || "<?= token ?>";
+            if (!token || token === 'undefined' || token === 'null') {
+                // Redirect to login if token is missing/invalid
+                window.location.href = 'Index.html'; // Change to your login page if needed
+                return null;
+            }
+            window.sessionToken = token;
+            localStorage.setItem('sessionToken', token);
+            return token;
+        }
+        // Use window.sessionToken only, do not redeclare
+        var currentEpj = "<?!= tripInfo.epj; ?>";
+        
+        // Load zone options and EPJ details asynchronously
+        function loadCheckinData() {
+            var token = getSessionToken();
+            if (!token) return;
+            google.script.run
+                .withSuccessHandler(function(data) {
+                    const checkInZone = document.getElementById('checkInZone');
+                    checkInZone.innerHTML = data.zoneOptions;
+                    checkInZone.disabled = false;
+                    document.getElementById('checkInBtn').disabled = false;
+                    document.getElementById('feedback').innerText = '';
+                    // Check if current EPJ is store-only and show notice
+                    if (data.currentEpjIsStoreOnly) {
+                        document.getElementById('storeOnlyNotice').style.display = 'block';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    // If session error, redirect to login
+                    if (error && error.message && error.message.includes('Invalid session')) {
+                        window.location.href = 'Index.html';
+                    } else {
+                        document.getElementById('feedback').innerText = 'Error loading zones: ' + error.message;
+                    }
+                })
+                .getCheckinFormData({token: token, epj: currentEpj});
+        }
+        loadCheckinData();
+        
         function checkIn() {
             const confirmationCheckbox = document.getElementById('pluggedInConfirmation');
             const checkInBtn = document.getElementById('checkInBtn');
+            var token = getSessionToken();
+            if (!token) return;
             if (!confirmationCheckbox.checked) {
-                app.toast('Please confirm the EPJ is plugged in.', { variant: 'error' });
+                alert('You must confirm the EPJ is plugged in before checking it in.');
                 return;
             }
             const checkInZone = document.getElementById('checkInZone').value;
             if (!checkInZone) {
-                app.toast('Please select the final location.', { variant: 'error' });
+                alert('Please select the final location of the EPJ.');
                 return;
             }
             const faultReport = document.getElementById('faultReport').value;
             document.getElementById("feedback").innerText = "Processing Check-In...";
             checkInBtn.disabled = true;
-            app.showLoading();
             google.script.run.withSuccessHandler(onSuccess).processCheckIn({
-                token: sessionToken,
-                checkInZone: checkInZone,
+                token: token, 
+                checkInZone: checkInZone, 
                 faultReport: faultReport,
                 pluggedIn: confirmationCheckbox.checked
             });
         }
-
+        
         function onSuccess(message) {
             const checkInBtn = document.getElementById('checkInBtn');
-            app.hideLoading();
             if (message.startsWith('Error:')) {
                 document.getElementById("feedback").innerText = '';
                 checkInBtn.disabled = false;
-                app.toast(message, { variant: 'error' });
+                alert(message);
             } else {
                 document.querySelector('article').innerHTML = `
                     <h2>Success!</h2>
                     <p>${message}</p>
                     <p>Returning to login screen...</p>
                 `;
-                app.toast('Check-In complete.');
                 setTimeout(logout, 2000);
             }
         }

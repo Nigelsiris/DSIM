@@ -3,41 +3,89 @@
     <head>
         <base target="_top">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-        <?!= include('SharedStyles'); ?>
-        <?!= include('AppShellStyles'); ?>
-        <style>
-        main { padding: 20px; }
-        .overflow-auto {
-            margin: 1rem -1rem;
-            padding: 0 1rem;
-        }
-        @media (max-width: 768px) {
-            .overflow-auto table {
+        <style> 
+            main { padding: 20px; }
+            
+            /* EPJ Grid Enhancements */
+            .epj-card {
+                border: 2px solid;
+                padding: 10px;
+                text-align: center;
+                border-radius: 5px;
+                cursor: pointer;
+                position: relative;
+                transition: transform 0.2s, box-shadow 0.2s;
+                user-select: none;
+            }
+            
+            .epj-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            
+            .epj-card.store-only::after {
+                content: '🏪';
+                position: absolute;
+                top: 2px;
+                right: 2px;
+                font-size: 1.2em;
+            }
+            
+            /* Context Menu */
+            .context-menu {
+                position: fixed;
+                background: var(--card-background-color);
+                border: 1px solid var(--muted-border-color);
+                border-radius: 0.5rem;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                padding: 0.5rem 0;
+                z-index: 1000;
+                min-width: 200px;
+                display: none;
+            }
+            
+            .context-menu.active {
                 display: block;
-                overflow-x: auto;
-                white-space: nowrap;
             }
-            .grid {
-                grid-template-columns: 1fr !important;
+            
+            .context-menu-item {
+                padding: 0.5rem 1rem;
+                cursor: pointer;
+                transition: background 0.2s;
+                border: none;
+                background: none;
+                width: 100%;
+                text-align: left;
+                color: inherit;
+                font-size: 0.9rem;
             }
-        }
+            
+            .context-menu-item:hover {
+                background: var(--primary-focus);
+            }
+            
+            .context-menu-divider {
+                height: 1px;
+                background: var(--muted-border-color);
+                margin: 0.25rem 0;
+            }
+            
+            .toggle-indicator {
+                float: right;
+                font-size: 0.9em;
+            }
         </style>
     </head>
     <body>
         <main class="container">
-        <div class="loading-overlay">
-            <div class="loading-spinner"></div>
-        </div>
-        <div id="toast" class="toast" role="status" aria-live="assertive"></div>
-            <div id="topRightControls" class="top-controls">
+            <div style="position: absolute; top: 1rem; right: 1rem; z-index: 10;">
                 <button class="contrast" onclick="logout()">Logout</button>
-                <!-- Theme toggle will be injected here -->
             </div>
 
             <h1 style="text-align:center;">Admin Control Panel</h1>
             
             <article>
-                <h3 style="text-align:center;">Live EPJ Status</h3>
+                <h3 style="text-align:center;">🔧 EPJ Management <small>(Right-click for quick actions)</small></h3>
                 <div id="statusGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;"></div>
             </article>
 
@@ -100,19 +148,44 @@
             <p id="feedback" style="text-align:center; min-height: 20px;"></p>
         </main>
 
-        <?!= include('AppShellScript'); ?>
+        <!-- Context Menu for EPJ Cards -->
+        <div id="epjContextMenu" class="context-menu">
+            <div class="context-menu-item" onclick="quickChangeStatus('Available')">✅ Set Available</div>
+            <div class="context-menu-item" onclick="quickChangeStatus('Checked Out')">🚚 Set Checked Out</div>
+            <div class="context-menu-item" onclick="quickChangeStatus('Maintenance')">🔧 Set Maintenance</div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" onclick="toggleStoreOnly()">
+                🏪 Store Delivery Only <span class="toggle-indicator" id="storeToggleIndicator"></span>
+            </div>
+        </div>
+
         <script>
             // Assign the token to the global sessionToken variable.
             sessionToken = "<?= token ?>";
 
             let isFirstLoad = true;
-
+            let currentContextEpj = null;
+            let allEpjDetails = [];
+            
             // Clear any previously existing timer before this script runs again.
             if (window.dashboardRefreshTimer) {
                 clearInterval(window.dashboardRefreshTimer);
             }
 
-            const app = AppShell.init();
+            // Close context menu when clicking anywhere
+            document.addEventListener('click', function(e) {
+                const menu = document.getElementById('epjContextMenu');
+                if (menu && !e.target.closest('.context-menu') && !e.target.closest('.epj-card')) {
+                    hideContextMenu();
+                }
+            });
+            
+            // Prevent default context menu on the entire page to avoid conflicts
+            document.addEventListener('contextmenu', function(e) {
+                if (e.target.closest('.epj-card')) {
+                    e.preventDefault();
+                }
+            });
 
             function logout() {
               if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
@@ -122,27 +195,27 @@
             }
 
             function loadDashboardData() {
-                if (isFirstLoad) { 
-                    document.getElementById('feedback').innerText = 'Loading data...';
-                }
-                app.showLoading();
+                if (isFirstLoad) { document.getElementById('feedback').innerText = 'Loading data...'; }
                 google.script.run
-                    .withSuccessHandler(function(data) {
-                        populateDashboard(data);
-                        app.hideLoading();
-                    })
+                    .withSuccessHandler(populateDashboard)
                     .withFailureHandler(err => {
                         document.getElementById('feedback').innerText = `Error loading data: ${err.message}`;
-                        app.toast('Error loading data', { variant: 'error' });
-                        app.hideLoading();
-                        if (err.message && err.message.includes("Permission denied")) {
+                        if (err.message.includes("Permission denied")) { 
                             if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
-                            setTimeout(logout, 2000);
+                            setTimeout(logout, 2000); 
                         }
                     })
                     .getDashboardData({token: sessionToken});
+                
+                // Load EPJ details for context menu
+                google.script.run
+                    .withSuccessHandler(function(details) {
+                        allEpjDetails = details;
+                    })
+                    .getAllEpjsWithDetails({token: sessionToken});
             }
-
+            
+            // Load immediately when page loads
             loadDashboardData();
             // Assign the timer to a property on the global 'window' object to prevent re-declaration errors.
             window.dashboardRefreshTimer = setInterval(loadDashboardData, 60000);
@@ -153,11 +226,29 @@
                 const maintenanceSelect = document.getElementById('maintenanceEpj');
                 grid.innerHTML = '';
                 maintenanceSelect.innerHTML = '<option disabled selected>Select EPJ...</option>';
+                
                 data.epjStatuses.forEach(item => {
                     let color = item.status === 'Available' ? 'green' : (item.status === 'Checked Out' ? 'red' : 'orange');
-                    grid.innerHTML += `<div style='border:1px solid ${color}; color:${color}; padding:10px; text-align:center; border-radius:5px;'><b>${item.epj}</b><br><small>${item.status}</small></div>`;
+                    const storeOnlyClass = item.storeOnly ? ' store-only' : '';
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = `epj-card${storeOnlyClass}`;
+                    cardDiv.style.borderColor = color;
+                    cardDiv.style.color = color;
+                    cardDiv.innerHTML = `<b>${item.epj}</b><br><small>${item.status}</small>`;
+                    cardDiv.dataset.epj = item.epj;
+                    cardDiv.dataset.status = item.status;
+                    cardDiv.dataset.storeOnly = item.storeOnly || false;
+                    
+                    // Add right-click event
+                    cardDiv.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        showContextMenu(e, item.epj, item.storeOnly);
+                    });
+                    
+                    grid.appendChild(cardDiv);
                     maintenanceSelect.innerHTML += `<option>${item.epj}</option>`;
                 });
+                
                 const activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
                 activeTableBody.innerHTML = '';
                 data.activeCheckouts.forEach(trip => {
@@ -174,6 +265,73 @@
                 document.getElementById('feedback').innerText = '';
                 isFirstLoad = false;
             }
+
+            function showContextMenu(event, epj, storeOnly) {
+                const menu = document.getElementById('epjContextMenu');
+                const indicator = document.getElementById('storeToggleIndicator');
+                
+                currentContextEpj = epj;
+                
+                // Update toggle indicator
+                indicator.innerText = storeOnly ? '✓' : '';
+                
+                // Position menu
+                menu.style.left = event.pageX + 'px';
+                menu.style.top = event.pageY + 'px';
+                menu.classList.add('active');
+            }
+
+            function hideContextMenu() {
+                const menu = document.getElementById('epjContextMenu');
+                menu.classList.remove('active');
+            }
+
+            function quickChangeStatus(newStatus) {
+                if (!currentContextEpj) return;
+                
+                hideContextMenu();
+                document.getElementById('feedback').innerText = `Updating EPJ ${currentContextEpj}...`;
+                
+                google.script.run
+                    .withSuccessHandler(function(message) {
+                        document.getElementById('feedback').innerText = message;
+                        setTimeout(loadDashboardData, 500);
+                    })
+                    .withFailureHandler(function(err) {
+                        document.getElementById('feedback').innerText = 'Error: ' + err.message;
+                    })
+                    .adminQuickUpdateEpjStatus({
+                        token: sessionToken,
+                        epj: currentContextEpj,
+                        status: newStatus
+                    });
+            }
+
+            function toggleStoreOnly() {
+                if (!currentContextEpj) return;
+                
+                const cardElement = document.querySelector(`[data-epj="${currentContextEpj}"]`);
+                const currentStoreOnly = cardElement.dataset.storeOnly === 'true';
+                const newStoreOnly = !currentStoreOnly;
+                
+                hideContextMenu();
+                document.getElementById('feedback').innerText = `Updating EPJ ${currentContextEpj}...`;
+                
+                google.script.run
+                    .withSuccessHandler(function(message) {
+                        document.getElementById('feedback').innerText = message;
+                        setTimeout(loadDashboardData, 500);
+                    })
+                    .withFailureHandler(function(err) {
+                        document.getElementById('feedback').innerText = 'Error: ' + err.message;
+                    })
+                    .adminToggleStoreOnly({
+                        token: sessionToken,
+                        epj: currentContextEpj,
+                        storeOnly: newStoreOnly
+                    });
+            }
+
             function openUserManagement() {
                 google.script.run.withSuccessHandler(function(html) {
                     document.open(); document.write(html); document.close();
@@ -182,7 +340,6 @@
             
             function handleSuccess(message) {
                 document.getElementById('feedback').innerText = message;
-                app.toast(message);
                 const fieldsToClear = ['newUsername', 'newPassword', 'newCarrier', 'massUserCsv'];
                 fieldsToClear.forEach(id => {
                     const el = document.getElementById(id);
