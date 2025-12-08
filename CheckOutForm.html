@@ -21,6 +21,36 @@
             font-weight: 600;
             margin-left: 0.5rem;
         }
+        
+        /* Loading spinner for buttons */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 1.2em;
+            height: 1.2em;
+            top: 50%;
+            left: 50%;
+            margin-top: -0.6em;
+            margin-left: -0.6em;
+            border: 3px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: btn-spin 0.6s linear infinite;
+        }
+        
+        .btn-loading span {
+            visibility: hidden;
+        }
+        
+        @keyframes btn-spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -61,165 +91,202 @@
                 <label for="faultReport">Pre-Trip: Report any existing issues (optional)</label>
                 <textarea id="faultReport" name="faultReport" placeholder="e.g., Fork is slightly bent, battery cover is cracked..."></textarea>
                 
-                <button type="submit" id="submitBtn">Complete Check-Out</button>
+                <button type="submit" id="submitBtn"><span>Complete Check-Out</span></button>
                 <p id="feedback" style="text-align:center; min-height:20px;">Loading equipment data...</p>
             </form>
         </article>
     </main>
     <script>
-        // Get token from parent window (Index.html) or localStorage
-        if (!window.sessionToken) {
-            window.sessionToken = (window.parent && window.parent.sessionToken) || localStorage.getItem('sessionToken') || "<?= token ?>";
-        }
-        let epjInfoMap = {};
-        let availableEpjsData = []; // Stores objects with epj and storeOnly flag
-        let zoneOptionsHtml = '';
+        (function() {
+            // Use the parent's sessionToken - do NOT redeclare with var/let/const
+            var _token = (typeof sessionToken !== 'undefined' && sessionToken) ? sessionToken : "<?= token ?>";
+            var _epjInfoMap = {};
+            var _availableEpjsData = []; // Stores objects with epj and storeOnly flag
+            var _zoneOptionsHtml = '';
 
-        const zoneFilter = document.getElementById('zoneFilter');
-        const epjSelect = document.getElementById('epjNumber');
-        const infoDisplay = document.getElementById('epjInfoDisplay');
-        const submitBtn = document.getElementById('submitBtn');
-        
-        // Disable form until data loads
-        submitBtn.disabled = true;
-        zoneFilter.disabled = true;
-
-        // Load data asynchronously
-        google.script.run
-            .withSuccessHandler(function(data) {
-                if (!data || !data.availableEpjs || typeof data.epjInfoMap !== 'object') {
-                    document.getElementById('feedback').innerText = 'Error loading equipment data.';
-                    infoDisplay.innerHTML = '<small style="color:red">Could not load equipment data. Please try again or contact admin.</small>';
-                    epjSelect.innerHTML = '<option disabled selected>Error loading EPJs</option>';
-                    submitBtn.disabled = true;
-                    return;
-                }
-                
-                // Process EPJ data with store-only flags
-                availableEpjsData = data.availableEpjs.map(item => {
-                    if (typeof item === 'string') {
-                        return { epj: item, storeOnly: false };
-                    }
-                    return item;
-                });
-                
-                epjInfoMap = data.epjInfoMap;
-                zoneOptionsHtml = data.zoneOptions;
-
-                // Populate zone filter - clear and rebuild
-                zoneFilter.innerHTML = '<option value="All" selected>Show All Zones</option>';
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = zoneOptionsHtml;
-                Array.from(tempDiv.querySelectorAll('option')).forEach(opt => {
-                    zoneFilter.appendChild(opt.cloneNode(true));
-                });
-
-                // Enable form
-                zoneFilter.disabled = false;
-                submitBtn.disabled = false;
-                document.getElementById('feedback').innerText = '';
-                infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
-
-                // Initialize EPJ list
-                updateEpjList();
-            })
-            .withFailureHandler(function(error) {
-                document.getElementById('feedback').innerText = 'Error loading data: ' + error.message;
-                infoDisplay.innerHTML = '<small style="color:red">Could not load equipment data. Please try again or contact admin.</small>';
-                epjSelect.innerHTML = '<option disabled selected>Error loading EPJs</option>';
-                submitBtn.disabled = true;
-            })
-            .getCheckoutFormData({token: window.sessionToken});
-
-        function updateEpjList() {
-            const selectedZone = zoneFilter.value;
-            epjSelect.innerHTML = ''; 
-            epjSelect.disabled = false;
-            let epjsShown = 0;
+            var zoneFilter = document.getElementById('zoneFilter');
+            var epjSelect = document.getElementById('epjNumber');
+            var infoDisplay = document.getElementById('epjInfoDisplay');
+            var submitBtn = document.getElementById('submitBtn');
             
-            availableEpjsData.forEach(item => {
-                const epj = item.epj;
-                const storeOnly = item.storeOnly;
-                const epjLocation = epjInfoMap[epj] ? epjInfoMap[epj].location : 'Unknown';
-                
-                // Apply zone filter
-                const matchesZone = selectedZone === 'All' || epjLocation === selectedZone;
-                
-                if (matchesZone) {
-                    const option = document.createElement('option');
-                    option.value = epj;
-                    option.textContent = epj + (storeOnly ? ' 🏪 (Store Delivery)' : '');
-                    epjSelect.appendChild(option);
-                    epjsShown++;
-                }
-            });
+            // Disable form until data loads
+            if (submitBtn) submitBtn.disabled = true;
+            if (zoneFilter) zoneFilter.disabled = true;
 
-            if (epjsShown === 0) {
-                const option = document.createElement('option');
-                option.textContent = 'No available EPJs in this zone';
-                option.disabled = true;
-                epjSelect.appendChild(option);
-            }
-            
-            epjSelect.value = ''; 
-            infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
-        }
-        
-        zoneFilter.addEventListener('change', updateEpjList);
-        
-        epjSelect.addEventListener('change', function() {
-            const selectedEpj = this.value;
-            if (selectedEpj && epjInfoMap[selectedEpj]) {
-                const info = epjInfoMap[selectedEpj];
-                const epjData = availableEpjsData.find(item => item.epj === selectedEpj);
-                const storeOnlyBadge = epjData && epjData.storeOnly 
-                    ? '<span class="store-only-badge">🏪 STORE DELIVERY ONLY</span>' 
-                    : '';
-                    
-                infoDisplay.innerHTML = `<small><b>EPJ:</b> ${selectedEpj} ${storeOnlyBadge}<br><b>Last Location:</b> ${info.location || 'N/A'}<br><b>Last Reported Fault:</b> ${info.fault || 'None'}</small>`;
-            } else {
-                infoDisplay.innerHTML = `<small>Select an EPJ to see its last reported status.</small>`;
-            }
-        });
-
-        document.getElementById('checkOutForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = {
-                token: window.sessionToken,
-                driverName: document.getElementById('driverName').value,
-                truckNumber: document.getElementById('truckNumber').value,
-                trailerNumber: document.getElementById('trailerNumber').value,
-                route: document.getElementById('route').value,
-                epjNumber: document.getElementById('epjNumber').value,
-                faultReport: document.getElementById('faultReport').value
-            };
-            if (!formData.epjNumber) { alert('Please select an EPJ.'); return; }
-            document.getElementById("feedback").innerText = "Processing Check-Out...";
-            submitBtn.disabled = true;
+            // Load data asynchronously
             google.script.run
-                .withSuccessHandler(onSuccess)
-                .withFailureHandler(function(error) {
-                    submitBtn.disabled = false;
-                    document.getElementById("feedback").innerText = '';
-                    alert('Error: ' + error.message);
+                .withSuccessHandler(function(data) {
+                    if (!data || !data.availableEpjs || typeof data.epjInfoMap !== 'object') {
+                        var feedback = document.getElementById('feedback');
+                        if (feedback) feedback.innerText = 'Error loading equipment data.';
+                        if (infoDisplay) infoDisplay.innerHTML = '<small style="color:red">Could not load equipment data. Please try again or contact admin.</small>';
+                        if (epjSelect) epjSelect.innerHTML = '<option disabled selected>Error loading EPJs</option>';
+                        if (submitBtn) submitBtn.disabled = true;
+                        return;
+                    }
+                    
+                    // Process EPJ data - filter OUT store-only EPJs (they can only be checked out from check-in form)
+                    _availableEpjsData = data.availableEpjs
+                        .map(function(item) {
+                            if (typeof item === 'string') {
+                                return { epj: item, storeOnly: false };
+                            }
+                            return item;
+                        })
+                        .filter(function(item) {
+                            return !item.storeOnly; // Exclude store-only EPJs
+                        });
+                    
+                    _epjInfoMap = data.epjInfoMap;
+                    _zoneOptionsHtml = data.zoneOptions;
+
+                    // Populate zone filter - clear and rebuild
+                    if (zoneFilter) {
+                        zoneFilter.innerHTML = '<option value="All" selected>Show All Zones</option>';
+                        var tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = _zoneOptionsHtml;
+                        Array.from(tempDiv.querySelectorAll('option')).forEach(function(opt) {
+                            zoneFilter.appendChild(opt.cloneNode(true));
+                        });
+                        zoneFilter.disabled = false;
+                    }
+
+                    // Enable form
+                    if (submitBtn) submitBtn.disabled = false;
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = '';
+                    if (infoDisplay) infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
+
+                    // Initialize EPJ list
+                    updateEpjList();
                 })
-                .processCheckOut(formData);
-        });
-        
-        function onSuccess(message) {
-             if (message.startsWith('Error:')) {
-                submitBtn.disabled = false;
-                document.getElementById("feedback").innerText = '';
-                alert(message);
-            } else {
-                document.querySelector('article').innerHTML = `
-                    <h2>Success!</h2>
-                    <p>${message}</p>
-                    <p>Returning to login screen...</p>
-                `;
-                setTimeout(logout, 2000);
+                .withFailureHandler(function(error) {
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = 'Error loading data: ' + (error.message || 'Unknown error');
+                    if (infoDisplay) infoDisplay.innerHTML = '<small style="color:red">Could not load equipment data. Please try again or contact admin.</small>';
+                    if (epjSelect) epjSelect.innerHTML = '<option disabled selected>Error loading EPJs</option>';
+                    if (submitBtn) submitBtn.disabled = true;
+                })
+                .getCheckoutFormData({token: _token});
+
+            function updateEpjList() {
+                var selectedZone = zoneFilter ? zoneFilter.value : 'All';
+                if (epjSelect) {
+                    epjSelect.innerHTML = ''; 
+                    epjSelect.disabled = false;
+                }
+                var epjsShown = 0;
+                
+                _availableEpjsData.forEach(function(item) {
+                    var epj = item.epj;
+                    var epjLocation = _epjInfoMap[epj] ? _epjInfoMap[epj].location : 'Unknown';
+                    
+                    // Apply zone filter
+                    var matchesZone = selectedZone === 'All' || epjLocation === selectedZone;
+                    
+                    if (matchesZone && epjSelect) {
+                        var option = document.createElement('option');
+                        option.value = epj;
+                        option.textContent = epj;
+                        epjSelect.appendChild(option);
+                        epjsShown++;
+                    }
+                });
+
+                if (epjsShown === 0 && epjSelect) {
+                    var option = document.createElement('option');
+                    option.textContent = 'No available EPJs in this zone';
+                    option.disabled = true;
+                    epjSelect.appendChild(option);
+                }
+                
+                if (epjSelect) epjSelect.value = ''; 
+                if (infoDisplay) infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
             }
-        }
+            
+            if (zoneFilter) {
+                zoneFilter.addEventListener('change', updateEpjList);
+            }
+            
+            if (epjSelect) {
+                epjSelect.addEventListener('change', function() {
+                    var selectedEpj = this.value;
+                    if (selectedEpj && _epjInfoMap[selectedEpj]) {
+                        var info = _epjInfoMap[selectedEpj];
+                        var epjData = _availableEpjsData.find(function(item) { return item.epj === selectedEpj; });
+                        var storeOnlyBadge = epjData && epjData.storeOnly 
+                            ? '<span class="store-only-badge">🏪 STORE DELIVERY ONLY</span>' 
+                            : '';
+                            
+                        if (infoDisplay) {
+                            infoDisplay.innerHTML = '<small><b>EPJ:</b> ' + selectedEpj + ' ' + storeOnlyBadge + '<br><b>Last Location:</b> ' + (info.location || 'N/A') + '<br><b>Last Reported Fault:</b> ' + (info.fault || 'None') + '</small>';
+                        }
+                    } else if (infoDisplay) {
+                        infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
+                    }
+                });
+            }
+
+            var checkOutForm = document.getElementById('checkOutForm');
+            if (checkOutForm) {
+                checkOutForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var formData = {
+                        token: _token,
+                        driverName: document.getElementById('driverName') ? document.getElementById('driverName').value : '',
+                        truckNumber: document.getElementById('truckNumber') ? document.getElementById('truckNumber').value : '',
+                        trailerNumber: document.getElementById('trailerNumber') ? document.getElementById('trailerNumber').value : '',
+                        route: document.getElementById('route') ? document.getElementById('route').value : '',
+                        epjNumber: epjSelect ? epjSelect.value : '',
+                        faultReport: document.getElementById('faultReport') ? document.getElementById('faultReport').value : ''
+                    };
+                    if (!formData.epjNumber) { alert('Please select an EPJ.'); return; }
+                    
+                    // Show loading state on button
+                    if (submitBtn) {
+                        submitBtn.classList.add('btn-loading');
+                        submitBtn.disabled = true;
+                    }
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = '';
+                    
+                    google.script.run
+                        .withSuccessHandler(onCheckoutSuccess)
+                        .withFailureHandler(function(error) {
+                            if (submitBtn) {
+                                submitBtn.classList.remove('btn-loading');
+                                submitBtn.disabled = false;
+                            }
+                            if (feedback) feedback.innerText = '';
+                            alert('Error: ' + (error.message || 'Unknown error'));
+                        })
+                        .processCheckOut(formData);
+                });
+            }
+            
+            function onCheckoutSuccess(message) {
+                if (message && message.startsWith && message.startsWith('Error:')) {
+                    if (submitBtn) {
+                        submitBtn.classList.remove('btn-loading');
+                        submitBtn.disabled = false;
+                    }
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = '';
+                    alert(message);
+                } else {
+                    var article = document.querySelector('article');
+                    if (article) {
+                        article.innerHTML = 
+                            '<h2>Success!</h2>' +
+                            '<p>' + message + '</p>' +
+                            '<p>Returning to login screen...</p>';
+                    }
+                    setTimeout(function() {
+                        if (typeof logout === 'function') logout();
+                    }, 2000);
+                }
+            }
+        })();
     </script>
 </body>
 </html>

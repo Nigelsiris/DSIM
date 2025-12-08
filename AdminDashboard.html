@@ -24,11 +24,13 @@
             }
             
             .epj-card.store-only::after {
-                content: '🏪';
+                content: '[S]';
                 position: absolute;
                 top: 2px;
                 right: 2px;
-                font-size: 1.2em;
+                font-size: 0.8em;
+                font-weight: bold;
+                color: var(--primary);
             }
             
             /* Context Menu */
@@ -74,6 +76,79 @@
                 float: right;
                 font-size: 0.9em;
             }
+            
+            /* Driver Login Notification */
+            .notification-toast {
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--primary);
+                color: white;
+                padding: 1rem 2rem;
+                border-radius: 0.5rem;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 2000;
+                display: none;
+                animation: slideDown 0.3s ease-out;
+                font-weight: bold;
+            }
+            
+            .notification-toast.show {
+                display: block;
+            }
+            
+            @keyframes slideDown {
+                from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+                to { transform: translateX(-50%) translateY(0); opacity: 1; }
+            }
+            
+            .notification-badge {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: var(--primary);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 0.5rem;
+                font-size: 0.85rem;
+                z-index: 1500;
+                display: none;
+            }
+            
+            .notification-badge.show {
+                display: block;
+            }
+            
+            /* Loading spinner for buttons */
+            .btn-loading {
+                position: relative;
+                pointer-events: none;
+                opacity: 0.7;
+            }
+            
+            .btn-loading::after {
+                content: '';
+                position: absolute;
+                width: 1em;
+                height: 1em;
+                top: 50%;
+                left: 50%;
+                margin-top: -0.5em;
+                margin-left: -0.5em;
+                border: 2px solid transparent;
+                border-top-color: currentColor;
+                border-radius: 50%;
+                animation: btn-spin 0.6s linear infinite;
+            }
+            
+            .btn-loading span {
+                visibility: hidden;
+            }
+            
+            @keyframes btn-spin {
+                to { transform: rotate(360deg); }
+            }
         </style>
     </head>
     <body>
@@ -85,7 +160,7 @@
             <h1 style="text-align:center;">Admin Control Panel</h1>
             
             <article>
-                <h3 style="text-align:center;">🔧 EPJ Management <small>(Right-click for quick actions)</small></h3>
+                <h3 style="text-align:center;">EPJ Management <small>(Right-click for quick actions)</small></h3>
                 <div id="statusGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;"></div>
             </article>
 
@@ -106,7 +181,7 @@
                     <input type="password" id="newPassword" placeholder="New Password" autocomplete="off">
                     <input type="text" id="newCarrier" placeholder="Carrier Name (Optional)">
                     <select id="newRole"><option>Driver</option><option>Admin</option><option>Load Support</option></select>
-                    <button onclick="addUser()">Create User</button>
+                    <button id="addUserBtn" onclick="addUser()"><span>Create User</span></button>
                 </article>
                 <article>
                     <h3><ins>Maintenance Mode</ins></h3>
@@ -116,7 +191,7 @@
                         <option value="Maintenance Start">Put IN Maintenance</option>
                         <option value="Maintenance End">Return FROM Maintenance</option>
                     </select>
-                    <button onclick="setMaintenance()">Update Status</button>
+                    <button id="maintenanceBtn" onclick="setMaintenance()"><span>Update Status</span></button>
                 </article>
             </div>
             
@@ -128,11 +203,11 @@
                     <small><b>Example:</b> <code>jdoe,Password123,Driver,Carrier A</code></small>
                 </blockquote>
                 <textarea id="massUserCsv" placeholder="user1,pass1,Driver,Carrier A&#10;user2,pass2,Admin,Carrier B" style="height: 150px;"></textarea>
-                <button onclick="massCreateUsers()">Create Multiple Users</button>
+                <button id="massCreateBtn" onclick="massCreateUsers()"><span>Create Multiple Users</span></button>
             </article>
 
             <article>
-                <button id="userMgmtBtn" style="width:100%;margin-top:2em;" onclick="openUserManagement()">Open User Management</button>
+                <button id="userMgmtBtn" style="width:100%;margin-top:2em;" onclick="openUserManagement()"><span>Open User Management</span></button>
             </article>
 
             <article>
@@ -148,264 +223,547 @@
             <p id="feedback" style="text-align:center; min-height: 20px;"></p>
         </main>
 
+        <!-- Driver Login Notification Toast -->
+        <div id="loginNotification" class="notification-toast"></div>
+        
+        <!-- Recent Logins Badge -->
+        <div id="recentLoginsBadge" class="notification-badge"></div>
+
         <!-- Context Menu for EPJ Cards -->
         <div id="epjContextMenu" class="context-menu">
-            <div class="context-menu-item" onclick="quickChangeStatus('Available')">✅ Set Available</div>
-            <div class="context-menu-item" onclick="quickChangeStatus('Checked Out')">🚚 Set Checked Out</div>
-            <div class="context-menu-item" onclick="quickChangeStatus('Maintenance')">🔧 Set Maintenance</div>
+            <div class="context-menu-item" onclick="quickChangeStatus('Available')">Set Available</div>
+            <div class="context-menu-item" onclick="quickChangeStatus('Checked Out')">Set Checked Out</div>
+            <div class="context-menu-item" onclick="quickChangeStatus('Maintenance')">Set Maintenance</div>
             <div class="context-menu-divider"></div>
             <div class="context-menu-item" onclick="toggleStoreOnly()">
-                🏪 Store Delivery Only <span class="toggle-indicator" id="storeToggleIndicator"></span>
+                Store Delivery Only <span class="toggle-indicator" id="storeToggleIndicator"></span>
             </div>
         </div>
 
         <script>
-            // Assign the token to the global sessionToken variable.
-            sessionToken = "<?= token ?>";
-
-            let isFirstLoad = true;
-            let currentContextEpj = null;
-            let allEpjDetails = [];
-            
-            // Clear any previously existing timer before this script runs again.
-            if (window.dashboardRefreshTimer) {
-                clearInterval(window.dashboardRefreshTimer);
-            }
-
-            // Close context menu when clicking anywhere
-            document.addEventListener('click', function(e) {
-                const menu = document.getElementById('epjContextMenu');
-                if (menu && !e.target.closest('.context-menu') && !e.target.closest('.epj-card')) {
-                    hideContextMenu();
+            (function() {
+                // Get token from multiple sources to ensure we have it
+                var _token = null;
+                
+                // First try the server-side template variable
+                <?
+                  if (typeof token !== 'undefined' && token) {
+                    output.append('_token = "' + token + '";');
+                  }
+                ?>
+                
+                // If template didn't work, try global sessionToken
+                if (!_token) {
+                    if (typeof sessionToken !== 'undefined' && sessionToken) {
+                        _token = sessionToken;
+                    }
                 }
-            });
-            
-            // Prevent default context menu on the entire page to avoid conflicts
-            document.addEventListener('contextmenu', function(e) {
-                if (e.target.closest('.epj-card')) {
-                    e.preventDefault();
+                
+                // Try localStorage as fallback
+                if (!_token) {
+                    _token = localStorage.getItem('sessionToken');
                 }
-            });
-
-            function logout() {
-              if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
-              google.script.run.withSuccessHandler(() => {
-                document.querySelector('main').innerHTML = '<h1>You have been logged out.</h1>';
-              }).logoutUser({token: sessionToken});
-            }
-
-            function loadDashboardData() {
-                if (isFirstLoad) { document.getElementById('feedback').innerText = 'Loading data...'; }
-                google.script.run
-                    .withSuccessHandler(populateDashboard)
-                    .withFailureHandler(err => {
-                        document.getElementById('feedback').innerText = `Error loading data: ${err.message}`;
-                        if (err.message.includes("Permission denied")) { 
-                            if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
-                            setTimeout(logout, 2000); 
+                
+                // Try parent window
+                if (!_token) {
+                    try {
+                        if (window.parent && window.parent.sessionToken) {
+                            _token = window.parent.sessionToken;
                         }
-                    })
-                    .getDashboardData({token: sessionToken});
+                    } catch(e) {}
+                }
                 
-                // Load EPJ details for context menu
-                google.script.run
-                    .withSuccessHandler(function(details) {
-                        allEpjDetails = details;
-                    })
-                    .getAllEpjsWithDetails({token: sessionToken});
-            }
-            
-            // Load immediately when page loads
-            loadDashboardData();
-            // Assign the timer to a property on the global 'window' object to prevent re-declaration errors.
-            window.dashboardRefreshTimer = setInterval(loadDashboardData, 60000);
+                // Set global sessionToken for other functions
+                window.sessionToken = _token;
+                
+                // Debug: log token status
+                console.log('Admin Dashboard token:', _token ? 'found' : 'NOT FOUND');
 
-            function populateDashboard(data) {
-                if (!data) { document.getElementById('feedback').innerText = 'Error: No data loaded.'; return; }
-                const grid = document.getElementById('statusGrid');
-                const maintenanceSelect = document.getElementById('maintenanceEpj');
-                grid.innerHTML = '';
-                maintenanceSelect.innerHTML = '<option disabled selected>Select EPJ...</option>';
+                var _isFirstLoad = true;
+                var _currentContextEpj = null;
+                var _allEpjDetails = [];
+                var _lastSeenLoginTime = Date.now(); // Track last seen login to avoid duplicate notifications
+                var _notificationSound = null;
                 
-                data.epjStatuses.forEach(item => {
-                    let color = item.status === 'Available' ? 'green' : (item.status === 'Checked Out' ? 'red' : 'orange');
-                    const storeOnlyClass = item.storeOnly ? ' store-only' : '';
-                    const cardDiv = document.createElement('div');
-                    cardDiv.className = `epj-card${storeOnlyClass}`;
-                    cardDiv.style.borderColor = color;
-                    cardDiv.style.color = color;
-                    cardDiv.innerHTML = `<b>${item.epj}</b><br><small>${item.status}</small>`;
-                    cardDiv.dataset.epj = item.epj;
-                    cardDiv.dataset.status = item.status;
-                    cardDiv.dataset.storeOnly = item.storeOnly || false;
+                // Initialize notification sound (simple beep using Web Audio API)
+                function initNotificationSound() {
+                    try {
+                        var AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (AudioContext) {
+                            window._audioCtx = new AudioContext();
+                        }
+                    } catch(e) {
+                        console.log('Audio not supported:', e);
+                    }
+                }
+                initNotificationSound();
+                
+                function playChime() {
+                    try {
+                        if (!window._audioCtx) return;
+                        var ctx = window._audioCtx;
+                        if (ctx.state === 'suspended') ctx.resume();
+                        
+                        // Create a pleasant two-tone chime
+                        var now = ctx.currentTime;
+                        
+                        // First tone (higher)
+                        var osc1 = ctx.createOscillator();
+                        var gain1 = ctx.createGain();
+                        osc1.connect(gain1);
+                        gain1.connect(ctx.destination);
+                        osc1.frequency.value = 880; // A5
+                        osc1.type = 'sine';
+                        gain1.gain.setValueAtTime(0.3, now);
+                        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                        osc1.start(now);
+                        osc1.stop(now + 0.3);
+                        
+                        // Second tone (lower, slight delay)
+                        var osc2 = ctx.createOscillator();
+                        var gain2 = ctx.createGain();
+                        osc2.connect(gain2);
+                        gain2.connect(ctx.destination);
+                        osc2.frequency.value = 659.25; // E5
+                        osc2.type = 'sine';
+                        gain2.gain.setValueAtTime(0.3, now + 0.15);
+                        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                        osc2.start(now + 0.15);
+                        osc2.stop(now + 0.5);
+                    } catch(e) {
+                        console.log('Error playing chime:', e);
+                    }
+                }
+                
+                function showNotification(username) {
+                    var toast = document.getElementById('loginNotification');
+                    if (toast) {
+                        toast.innerHTML = 'Driver "' + username + '" has signed in!';
+                        toast.classList.add('show');
+                        playChime();
+                        
+                        // Auto-hide after 5 seconds
+                        setTimeout(function() {
+                            toast.classList.remove('show');
+                        }, 5000);
+                    }
+                }
+                
+                function checkForNewDriverLogins() {
+                    if (!_token) return;
                     
-                    // Add right-click event
-                    cardDiv.addEventListener('contextmenu', function(e) {
+                    google.script.run
+                        .withSuccessHandler(function(logins) {
+                            if (logins && logins.length > 0) {
+                                // Check for logins newer than our last seen time
+                                logins.forEach(function(login) {
+                                    if (login.timestampMs > _lastSeenLoginTime) {
+                                        showNotification(login.username);
+                                        _lastSeenLoginTime = login.timestampMs;
+                                    }
+                                });
+                                
+                                // Update badge with recent count
+                                var badge = document.getElementById('recentLoginsBadge');
+                                if (badge && logins.length > 0) {
+                                    badge.innerHTML = logins.length + ' recent driver login' + (logins.length > 1 ? 's' : '');
+                                    badge.classList.add('show');
+                                } else if (badge) {
+                                    badge.classList.remove('show');
+                                }
+                            } else {
+                                var badge = document.getElementById('recentLoginsBadge');
+                                if (badge) badge.classList.remove('show');
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            console.log('Error checking driver logins:', err.message);
+                        })
+                        .getRecentDriverLogins({token: _token, minutesBack: 2});
+                }
+                
+                // Check for new logins every 15 seconds
+                if (window.loginCheckTimer) clearInterval(window.loginCheckTimer);
+                window.loginCheckTimer = setInterval(checkForNewDriverLogins, 15000);
+                // Initial check after 3 seconds (give page time to load)
+                setTimeout(checkForNewDriverLogins, 3000);
+                
+                // Clear any previously existing timer before this script runs again.
+                if (window.dashboardRefreshTimer) {
+                    clearInterval(window.dashboardRefreshTimer);
+                }
+
+                // Close context menu when clicking anywhere
+                document.addEventListener('click', function(e) {
+                    var menu = document.getElementById('epjContextMenu');
+                    if (menu && !e.target.closest('.context-menu') && !e.target.closest('.epj-card')) {
+                        hideContextMenu();
+                    }
+                });
+                
+                // Prevent default context menu on the entire page to avoid conflicts
+                document.addEventListener('contextmenu', function(e) {
+                    if (e.target.closest('.epj-card')) {
                         e.preventDefault();
-                        showContextMenu(e, item.epj, item.storeOnly);
-                    });
+                    }
+                });
+
+                window.logout = function() {
+                    if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
+                    if (window.loginCheckTimer) clearInterval(window.loginCheckTimer);
+                    google.script.run.withSuccessHandler(function() {
+                        var mainEl = document.querySelector('main');
+                        if (mainEl) mainEl.innerHTML = '<h1>You have been logged out.</h1>';
+                    }).logoutUser({token: _token});
+                };
+
+                function loadDashboardData() {
+                    var feedback = document.getElementById('feedback');
+                    if (_isFirstLoad && feedback) { feedback.innerText = 'Loading data...'; }
                     
-                    grid.appendChild(cardDiv);
-                    maintenanceSelect.innerHTML += `<option>${item.epj}</option>`;
-                });
-                
-                const activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
-                activeTableBody.innerHTML = '';
-                data.activeCheckouts.forEach(trip => {
-                    activeTableBody.innerHTML += `<tr><td>${trip.driver}</td><td>${trip.carrier}</td><td>${trip.epj}</td><td>${trip.truck} / ${trip.trailer}</td><td>${trip.route}</td><td>${trip.timestamp}</td><td><button class="secondary outline" onclick="forceCheckIn('${trip.tripId}', '${trip.epj}')">Force Check-In</button></td></tr>`;
-                });
-                const maintTableBody = document.querySelector('#maintenanceTable tbody');
-                maintTableBody.innerHTML = '';
-                if (data.maintenanceLog) {
-                    data.maintenanceLog.forEach(row => {
-                        const timestamp = new Date(row[0]).toLocaleString();
-                        maintTableBody.innerHTML += `<tr><td>${timestamp}</td><td>${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`;
-                    });
+                    if (!_token) {
+                        if (feedback) feedback.innerText = 'Error: No session token. Please log in again.';
+                        return;
+                    }
+                    
+                    google.script.run
+                        .withSuccessHandler(populateDashboard)
+                        .withFailureHandler(function(err) {
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = 'Error loading data: ' + (err.message || 'Unknown error');
+                            if (err.message && err.message.indexOf("Permission denied") !== -1) { 
+                                if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
+                                setTimeout(function() { if (typeof logout === 'function') logout(); }, 2000); 
+                            }
+                        })
+                        .getDashboardData({token: _token});
+                    
+                    // Load EPJ details for context menu
+                    google.script.run
+                        .withSuccessHandler(function(details) {
+                            _allEpjDetails = details || [];
+                        })
+                        .withFailureHandler(function(err) {
+                            console.log('Error loading EPJ details:', err.message);
+                        })
+                        .getAllEpjsWithDetails({token: _token});
                 }
-                document.getElementById('feedback').innerText = '';
-                isFirstLoad = false;
-            }
+                
+                // Load immediately when page loads
+                loadDashboardData();
+                // Assign the timer to a property on the global 'window' object to prevent re-declaration errors.
+                window.dashboardRefreshTimer = setInterval(loadDashboardData, 60000);
 
-            function showContextMenu(event, epj, storeOnly) {
-                const menu = document.getElementById('epjContextMenu');
-                const indicator = document.getElementById('storeToggleIndicator');
-                
-                currentContextEpj = epj;
-                
-                // Update toggle indicator
-                indicator.innerText = storeOnly ? '✓' : '';
-                
-                // Position menu
-                menu.style.left = event.pageX + 'px';
-                menu.style.top = event.pageY + 'px';
-                menu.classList.add('active');
-            }
+                function populateDashboard(data) {
+                    var feedback = document.getElementById('feedback');
+                    if (!data) { 
+                        if (feedback) feedback.innerText = 'Error: No data received from server. Token may be invalid.'; 
+                        return; 
+                    }
+                    var grid = document.getElementById('statusGrid');
+                    var maintenanceSelect = document.getElementById('maintenanceEpj');
+                    if (grid) grid.innerHTML = '';
+                    if (maintenanceSelect) maintenanceSelect.innerHTML = '<option disabled selected>Select EPJ...</option>';
+                    
+                    if (data.epjStatuses && data.epjStatuses.length > 0) {
+                        data.epjStatuses.forEach(function(item) {
+                            var color = item.status === 'Available' ? 'green' : (item.status === 'Checked Out' ? 'red' : 'orange');
+                            var storeOnlyClass = item.storeOnly ? ' store-only' : '';
+                            var cardDiv = document.createElement('div');
+                            cardDiv.className = 'epj-card' + storeOnlyClass;
+                            cardDiv.style.borderColor = color;
+                            cardDiv.style.color = color;
+                            cardDiv.innerHTML = '<b>' + item.epj + '</b><br><small>' + item.status + '</small>';
+                            cardDiv.dataset.epj = item.epj;
+                            cardDiv.dataset.status = item.status;
+                            cardDiv.dataset.storeOnly = item.storeOnly || false;
+                            
+                            // Add right-click event
+                            cardDiv.addEventListener('contextmenu', function(e) {
+                                e.preventDefault();
+                                showContextMenu(e, item.epj, item.storeOnly);
+                            });
+                            
+                            if (grid) grid.appendChild(cardDiv);
+                            if (maintenanceSelect) maintenanceSelect.innerHTML += '<option>' + item.epj + '</option>';
+                        });
+                    } else {
+                        if (grid) grid.innerHTML = '<p>No EPJs found in the system.</p>';
+                    }
+                    
+                    var activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
+                    if (activeTableBody) {
+                        activeTableBody.innerHTML = '';
+                        if (data.activeCheckouts && data.activeCheckouts.length > 0) {
+                            data.activeCheckouts.forEach(function(trip) {
+                                activeTableBody.innerHTML += '<tr><td>' + trip.driver + '</td><td>' + trip.carrier + '</td><td>' + trip.epj + '</td><td>' + trip.truck + ' / ' + trip.trailer + '</td><td>' + trip.route + '</td><td>' + trip.timestamp + '</td><td><button class="secondary outline" onclick="forceCheckIn(\'' + trip.tripId + '\', \'' + trip.epj + '\')">Force Check-In</button></td></tr>';
+                            });
+                        } else {
+                            activeTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No active checkouts</td></tr>';
+                        }
+                    }
+                    
+                    var maintTableBody = document.querySelector('#maintenanceTable tbody');
+                    if (maintTableBody) {
+                        maintTableBody.innerHTML = '';
+                        if (data.maintenanceLog && data.maintenanceLog.length > 0) {
+                            data.maintenanceLog.forEach(function(row) {
+                                var timestamp = new Date(row[0]).toLocaleString();
+                                maintTableBody.innerHTML += '<tr><td>' + timestamp + '</td><td>' + row[1] + '</td><td>' + row[2] + '</td><td>' + row[3] + '</td><td>' + row[4] + '</td></tr>';
+                            });
+                        } else {
+                            maintTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No maintenance events</td></tr>';
+                        }
+                    }
+                    if (feedback) feedback.innerText = '';
+                    _isFirstLoad = false;
+                }
 
-            function hideContextMenu() {
-                const menu = document.getElementById('epjContextMenu');
-                menu.classList.remove('active');
-            }
+                function showContextMenu(event, epj, storeOnly) {
+                    var menu = document.getElementById('epjContextMenu');
+                    var indicator = document.getElementById('storeToggleIndicator');
+                    
+                    _currentContextEpj = epj;
+                    
+                    // Update toggle indicator (ASCII only to avoid template issues)
+                    if (indicator) indicator.innerText = storeOnly ? 'Y' : '';
+                    
+                    // Position menu - ensure it stays within viewport
+                    if (menu) {
+                        // First show menu to get its dimensions
+                        menu.style.visibility = 'hidden';
+                        menu.classList.add('active');
+                        
+                        var menuWidth = menu.offsetWidth;
+                        var menuHeight = menu.offsetHeight;
+                        var viewportWidth = window.innerWidth;
+                        var viewportHeight = window.innerHeight;
+                        var scrollY = window.scrollY || window.pageYOffset;
+                        var scrollX = window.scrollX || window.pageXOffset;
+                        
+                        // Calculate position
+                        var left = event.pageX;
+                        var top = event.pageY;
+                        
+                        // Adjust if menu would go off right edge
+                        if (left + menuWidth > scrollX + viewportWidth) {
+                            left = scrollX + viewportWidth - menuWidth - 10;
+                        }
+                        
+                        // Adjust if menu would go off bottom edge
+                        if (top + menuHeight > scrollY + viewportHeight) {
+                            top = scrollY + viewportHeight - menuHeight - 10;
+                        }
+                        
+                        // Ensure minimum positions
+                        if (left < scrollX) left = scrollX + 10;
+                        if (top < scrollY) top = scrollY + 10;
+                        
+                        menu.style.left = left + 'px';
+                        menu.style.top = top + 'px';
+                        menu.style.visibility = 'visible';
+                    }
+                }
 
-            function quickChangeStatus(newStatus) {
-                if (!currentContextEpj) return;
+                function hideContextMenu() {
+                    var menu = document.getElementById('epjContextMenu');
+                    if (menu) menu.classList.remove('active');
+                }
+                window.hideContextMenu = hideContextMenu;
+
+                window.quickChangeStatus = function(newStatus) {
+                    if (!_currentContextEpj) return;
+                    
+                    hideContextMenu();
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = 'Updating EPJ ' + _currentContextEpj + '...';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = message;
+                            setTimeout(loadDashboardData, 500);
+                        })
+                        .withFailureHandler(function(err) {
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = 'Error: ' + (err.message || 'Unknown error');
+                        })
+                        .adminQuickUpdateEpjStatus({
+                            token: _token,
+                            epj: _currentContextEpj,
+                            status: newStatus
+                        });
+                };
+
+                window.toggleStoreOnly = function() {
+                    if (!_currentContextEpj) return;
+                    
+                    var cardElement = document.querySelector('[data-epj="' + _currentContextEpj + '"]');
+                    var currentStoreOnly = cardElement && cardElement.dataset.storeOnly === 'true';
+                    var newStoreOnly = !currentStoreOnly;
+                    
+                    hideContextMenu();
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = 'Updating EPJ ' + _currentContextEpj + '...';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = message;
+                            setTimeout(loadDashboardData, 500);
+                        })
+                        .withFailureHandler(function(err) {
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = 'Error: ' + (err.message || 'Unknown error');
+                        })
+                        .adminToggleStoreOnly({
+                            token: _token,
+                            epj: _currentContextEpj,
+                            storeOnly: newStoreOnly
+                        });
+                };
+
+                window.openUserManagement = function() {
+                    var btn = document.getElementById('userMgmtBtn');
+                    setButtonLoading(btn, true);
+                    google.script.run
+                        .withSuccessHandler(function(html) {
+                            document.open(); document.write(html); document.close();
+                        })
+                        .withFailureHandler(function(err) {
+                            setButtonLoading(btn, false);
+                            alert('Error: ' + (err.message || 'Unknown error'));
+                        })
+                        .getUserManagementPage(_token);
+                };
                 
-                hideContextMenu();
-                document.getElementById('feedback').innerText = `Updating EPJ ${currentContextEpj}...`;
+                // Helper functions for button loading states
+                function setButtonLoading(btn, loading) {
+                    if (!btn) return;
+                    if (loading) {
+                        btn.classList.add('btn-loading');
+                        btn.disabled = true;
+                    } else {
+                        btn.classList.remove('btn-loading');
+                        btn.disabled = false;
+                    }
+                }
                 
-                google.script.run
-                    .withSuccessHandler(function(message) {
-                        document.getElementById('feedback').innerText = message;
+                function handleSuccessWithBtn(btnId) {
+                    return function(message) {
+                        var btn = document.getElementById(btnId);
+                        setButtonLoading(btn, false);
+                        var feedback = document.getElementById('feedback');
+                        if (feedback) feedback.innerText = message;
+                        var fieldsToClear = ['newUsername', 'newPassword', 'newCarrier', 'massUserCsv', 'maintenanceReason'];
+                        fieldsToClear.forEach(function(id) {
+                            var el = document.getElementById(id);
+                            if (el) el.value = '';
+                        });
                         setTimeout(loadDashboardData, 500);
-                    })
-                    .withFailureHandler(function(err) {
-                        document.getElementById('feedback').innerText = 'Error: ' + err.message;
-                    })
-                    .adminQuickUpdateEpjStatus({
-                        token: sessionToken,
-                        epj: currentContextEpj,
-                        status: newStatus
+                    };
+                }
+                
+                function handleFailureWithBtn(btnId) {
+                    return function(err) {
+                        var btn = document.getElementById(btnId);
+                        setButtonLoading(btn, false);
+                        var feedback = document.getElementById('feedback');
+                        if (feedback) feedback.innerText = 'Error: ' + (err.message || 'Unknown error');
+                    };
+                }
+                
+                function handleSuccess(message) {
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) feedback.innerText = message;
+                    var fieldsToClear = ['newUsername', 'newPassword', 'newCarrier', 'massUserCsv'];
+                    fieldsToClear.forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) el.value = '';
                     });
-            }
+                    setTimeout(loadDashboardData, 500);
+                }
 
-            function toggleStoreOnly() {
-                if (!currentContextEpj) return;
+                window.massCreateUsers = function() {
+                    var csvDataEl = document.getElementById('massUserCsv');
+                    var csvData = csvDataEl ? csvDataEl.value : '';
+                    if (!csvData.trim()) {
+                        alert('Please paste user data into the text box.');
+                        return;
+                    }
+                    var userCount = csvData.split('\n').filter(function(line) { return line.trim() !== ''; }).length;
+                    if (confirm('Are you sure you want to create ' + userCount + ' new user(s)?')) {
+                        var btn = document.getElementById('massCreateBtn');
+                        setButtonLoading(btn, true);
+                        google.script.run
+                            .withSuccessHandler(handleSuccessWithBtn('massCreateBtn'))
+                            .withFailureHandler(handleFailureWithBtn('massCreateBtn'))
+                            .adminMassCreateUsers({token: _token, csvData: csvData});
+                    }
+                };
+
+                window.forceCheckIn = function(tripId, epj) {
+                    if (confirm('Are you sure you want to force check-in EPJ ' + epj + '?')) {
+                        google.script.run.withSuccessHandler(handleSuccess).adminForceCheckIn({token: _token, tripId: tripId, epj: epj});
+                    }
+                };
+
+                window.addUser = function() {
+                    var usernameEl = document.getElementById('newUsername');
+                    var passwordEl = document.getElementById('newPassword');
+                    var roleEl = document.getElementById('newRole');
+                    var carrierEl = document.getElementById('newCarrier');
+                    var username = usernameEl ? usernameEl.value : '';
+                    var password = passwordEl ? passwordEl.value : '';
+                    var role = roleEl ? roleEl.value : 'Driver';
+                    var carrier = carrierEl ? carrierEl.value : '';
+                    if(!username || !password) { alert('Username and Password are required.'); return; }
+                    var btn = document.getElementById('addUserBtn');
+                    setButtonLoading(btn, true);
+                    google.script.run
+                        .withSuccessHandler(handleSuccessWithBtn('addUserBtn'))
+                        .withFailureHandler(handleFailureWithBtn('addUserBtn'))
+                        .adminAddUser({token: _token, username: username, password: password, role: role, carrier: carrier});
+                };
+
+                window.setMaintenance = function() {
+                    var epjEl = document.getElementById('maintenanceEpj');
+                    var actionEl = document.getElementById('maintenanceAction');
+                    var reasonEl = document.getElementById('maintenanceReason');
+                    var epj = epjEl ? epjEl.value : '';
+                    var action = actionEl ? actionEl.value : '';
+                    var reason = reasonEl ? reasonEl.value : '';
+                    if(!epj) { alert("Please select an EPJ."); return; }
+                    var btn = document.getElementById('maintenanceBtn');
+                    setButtonLoading(btn, true);
+                    google.script.run
+                        .withSuccessHandler(handleSuccessWithBtn('maintenanceBtn'))
+                        .withFailureHandler(handleFailureWithBtn('maintenanceBtn'))
+                        .adminSetMaintenanceStatus({token: _token, epj: epj, status: action, reason: reason});
+                };
+
+                window.editUser = function(username, currentRole, currentCarrier) {
+                    var newRole = prompt('Enter new role for "' + username + '": (Current: ' + currentRole + ')', currentRole);
+                    if (newRole === null) return;
+                    var newCarrier = prompt('Enter new carrier for "' + username + '": (Current: ' + currentCarrier + ')', currentCarrier);
+                    if (newCarrier !== null) {
+                        google.script.run.withSuccessHandler(handleSuccess).adminEditUser({token: _token, username: username, role: newRole, carrier: newCarrier});
+                    }
+                };
                 
-                const cardElement = document.querySelector(`[data-epj="${currentContextEpj}"]`);
-                const currentStoreOnly = cardElement.dataset.storeOnly === 'true';
-                const newStoreOnly = !currentStoreOnly;
+                window.resetPassword = function(username) {
+                    var newPassword = prompt('Enter a new password for user "' + username + '":');
+                    if (newPassword) {
+                        google.script.run.withSuccessHandler(handleSuccess).adminResetPassword({token: _token, username: username, newPassword: newPassword});
+                    }
+                };
                 
-                hideContextMenu();
-                document.getElementById('feedback').innerText = `Updating EPJ ${currentContextEpj}...`;
-                
-                google.script.run
-                    .withSuccessHandler(function(message) {
-                        document.getElementById('feedback').innerText = message;
-                        setTimeout(loadDashboardData, 500);
-                    })
-                    .withFailureHandler(function(err) {
-                        document.getElementById('feedback').innerText = 'Error: ' + err.message;
-                    })
-                    .adminToggleStoreOnly({
-                        token: sessionToken,
-                        epj: currentContextEpj,
-                        storeOnly: newStoreOnly
-                    });
-            }
-
-            function openUserManagement() {
-                google.script.run.withSuccessHandler(function(html) {
-                    document.open(); document.write(html); document.close();
-                }).getUserManagementPage(sessionToken);
-            }
-            
-            function handleSuccess(message) {
-                document.getElementById('feedback').innerText = message;
-                const fieldsToClear = ['newUsername', 'newPassword', 'newCarrier', 'massUserCsv'];
-                fieldsToClear.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.value = '';
-                });
-                setTimeout(loadDashboardData, 500);
-            }
-
-            function massCreateUsers() {
-                const csvData = document.getElementById('massUserCsv').value;
-                if (!csvData.trim()) {
-                    alert('Please paste user data into the text box.');
-                    return;
-                }
-                const userCount = csvData.split('\n').filter(line => line.trim() !== '').length;
-                if (confirm(`Are you sure you want to create ${userCount} new user(s)?`)) {
-                    document.getElementById('feedback').innerText = 'Processing batch user creation...';
-                    google.script.run.withSuccessHandler(handleSuccess).adminMassCreateUsers({token: sessionToken, csvData: csvData});
-                }
-            }
-
-            function forceCheckIn(tripId, epj) {
-                if (confirm(`Are you sure you want to force check-in EPJ ${epj}?`)) {
-                    google.script.run.withSuccessHandler(handleSuccess).adminForceCheckIn({token: sessionToken, tripId: tripId, epj: epj});
-                }
-            }
-
-            function addUser() {
-                const username = document.getElementById('newUsername').value;
-                const password = document.getElementById('newPassword').value;
-                const role = document.getElementById('newRole').value;
-                const carrier = document.getElementById('newCarrier').value;
-                if(!username || !password) { alert('Username and Password are required.'); return; }
-                google.script.run.withSuccessHandler(handleSuccess).adminAddUser({token: sessionToken, username: username, password: password, role: role, carrier: carrier});
-            }
-
-            function setMaintenance() {
-                const epj = document.getElementById('maintenanceEpj').value;
-                const action = document.getElementById('maintenanceAction').value;
-                const reason = document.getElementById('maintenanceReason').value;
-                if(!epj) { alert("Please select an EPJ."); return; }
-                google.script.run.withSuccessHandler(handleSuccess).adminSetMaintenanceStatus({token: sessionToken, epj: epj, status: action, reason: reason});
-            }
-
-            function editUser(username, currentRole, currentCarrier) {
-                const newRole = prompt(`Enter new role for "${username}": (Current: ${currentRole})`, currentRole);
-                if (newRole === null) return;
-                const newCarrier = prompt(`Enter new carrier for "${username}": (Current: ${currentCarrier})`, currentCarrier);
-                if (newCarrier !== null) {
-                    google.script.run.withSuccessHandler(handleSuccess).adminEditUser({token: sessionToken, username: username, role: newRole, carrier: newCarrier});
-                }
-            }
-            
-            function resetPassword(username) {
-                const newPassword = prompt(`Enter a new password for user "${username}":`);
-                if (newPassword) {
-                    google.script.run.withSuccessHandler(handleSuccess).adminResetPassword({token: sessionToken, username: username, newPassword: newPassword});
-                }
-            }
-            
-            function deleteUser(username) {
-                if (confirm(`Are you sure you want to permanently delete user "${username}"?`)) {
-                    google.script.run.withSuccessHandler(handleSuccess).adminDeleteUser({token: sessionToken, username: username});
-                }
-            }
+                window.deleteUser = function(username) {
+                    if (confirm('Are you sure you want to permanently delete user "' + username + '"?')) {
+                        google.script.run.withSuccessHandler(handleSuccess).adminDeleteUser({token: _token, username: username});
+                    }
+                };
+            })();
         </script>
     </body>
 </html>
-

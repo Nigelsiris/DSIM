@@ -308,6 +308,55 @@ function driverChangePassword(data) {
 
 
 // --- ADMIN & LOAD SUPPORT WORKFLOWS ---
+
+/**
+ * Get recent driver logins for admin notifications
+ * Returns logins from the last N minutes
+ */
+function getRecentDriverLogins(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const minutesBack = data.minutesBack || 2; // Default to last 2 minutes
+  const cutoffTime = new Date(Date.now() - (minutesBack * 60 * 1000));
+  
+  const loginLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_LOG_SHEET_NAME);
+  if (!loginLogSheet || loginLogSheet.getLastRow() < 2) return [];
+  
+  // Get recent rows (last 50 to be efficient)
+  const lastRow = loginLogSheet.getLastRow();
+  const startRow = Math.max(2, lastRow - 49);
+  const numRows = lastRow - startRow + 1;
+  const logData = loginLogSheet.getRange(startRow, 1, numRows, 2).getValues(); // Timestamp, Username
+  
+  // Get user info to filter drivers only
+  const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
+  const userData = userSheet.getRange(2, 1, userSheet.getLastRow() - 1, 3).getValues();
+  const userRoles = {};
+  userData.forEach(row => { if (row[0]) userRoles[row[0].toLowerCase()] = row[2]; });
+  
+  const recentLogins = [];
+  for (let i = logData.length - 1; i >= 0; i--) {
+    const timestamp = new Date(logData[i][0]);
+    const username = logData[i][1];
+    
+    if (timestamp >= cutoffTime) {
+      const role = userRoles[username.toLowerCase()];
+      if (role === 'Driver') {
+        recentLogins.push({
+          username: username,
+          timestamp: timestamp.toLocaleTimeString(),
+          timestampMs: timestamp.getTime()
+        });
+      }
+    } else {
+      break; // Older entries, stop checking
+    }
+  }
+  
+  return recentLogins;
+}
+
 function getDashboardData(data) {
   Logger.log('getDashboardData called with: ' + JSON.stringify(data));
   const session = getSession(data.token);
