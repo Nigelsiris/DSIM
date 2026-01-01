@@ -877,6 +877,95 @@ function getEquipmentStatusViewData() {
   });
 }
 
+// Add a new EPJ to the system
+function adminAddEpj(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const epjNumber = (data.epjNumber || '').toString().trim().toUpperCase();
+  if (!epjNumber) throw new Error('EPJ number is required.');
+  
+  const statusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  if (!statusSheet) throw new Error('EPJ Status sheet not found.');
+  
+  // Check if EPJ already exists
+  const lastRow = statusSheet.getLastRow();
+  if (lastRow >= 2) {
+    const existingEpjs = statusSheet.getRange('A2:A' + lastRow).getValues().flat();
+    if (existingEpjs.some(e => e.toString().toUpperCase() === epjNumber)) {
+      throw new Error('EPJ ' + epjNumber + ' already exists.');
+    }
+  }
+  
+  // Add new EPJ with default status 'Available'
+  const storeOnly = data.storeOnly === true || data.storeOnly === 'true';
+  statusSheet.appendRow([epjNumber, 'Available', storeOnly]);
+  
+  // Clear caches
+  CacheService.getScriptCache().remove('epjStatuses');
+  CacheService.getScriptCache().remove('epjInfoMap');
+  
+  return 'EPJ ' + epjNumber + ' added successfully.';
+}
+
+// Remove an EPJ from the system
+function adminRemoveEpj(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const epjNumber = (data.epjNumber || '').toString().trim().toUpperCase();
+  if (!epjNumber) throw new Error('EPJ number is required.');
+  
+  const statusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  if (!statusSheet) throw new Error('EPJ Status sheet not found.');
+  
+  const lastRow = statusSheet.getLastRow();
+  if (lastRow < 2) throw new Error('No EPJs found in the system.');
+  
+  const epjData = statusSheet.getRange('A2:C' + lastRow).getValues();
+  let rowToDelete = -1;
+  
+  for (let i = 0; i < epjData.length; i++) {
+    if (epjData[i][0].toString().toUpperCase() === epjNumber) {
+      rowToDelete = i + 2; // +2 because of header row and 0-index
+      break;
+    }
+  }
+  
+  if (rowToDelete === -1) {
+    throw new Error('EPJ ' + epjNumber + ' not found.');
+  }
+  
+  // Check if EPJ is currently checked out
+  if (epjData[rowToDelete - 2][1] === 'Checked Out') {
+    throw new Error('Cannot remove EPJ ' + epjNumber + ' - it is currently checked out.');
+  }
+  
+  statusSheet.deleteRow(rowToDelete);
+  
+  // Clear caches
+  CacheService.getScriptCache().remove('epjStatuses');
+  CacheService.getScriptCache().remove('epjInfoMap');
+  
+  return 'EPJ ' + epjNumber + ' removed successfully.';
+}
+
+// Get list of all EPJs for management
+function adminGetAllEpjs(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const statusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
+  if (!statusSheet || statusSheet.getLastRow() < 2) return [];
+  
+  const values = statusSheet.getRange('A2:C' + statusSheet.getLastRow()).getValues();
+  return values.filter(row => row[0]).map(row => ({
+    epj: row[0],
+    status: row[1],
+    storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes'
+  }));
+}
+
 function sha256(input) {
   const raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, input);
   let hash = '';

@@ -211,6 +211,29 @@
             </article>
 
             <article>
+                <h3><ins>EPJ Fleet Management</ins></h3>
+                <div class="grid">
+                    <div>
+                        <label>Add New EPJ</label>
+                        <input type="text" id="newEpjNumber" placeholder="EPJ Number (e.g., EPJ-001)" autocomplete="off">
+                        <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                            <input type="checkbox" id="newEpjStoreOnly" style="width:auto;">
+                            <span>Store Delivery Only</span>
+                        </label>
+                        <button id="addEpjBtn" onclick="addNewEpj()"><span>Add EPJ</span></button>
+                    </div>
+                    <div>
+                        <label>Remove EPJ</label>
+                        <select id="removeEpjSelect">
+                            <option value="" disabled selected>Select EPJ to remove...</option>
+                        </select>
+                        <p style="font-size:0.85rem; color:var(--pico-muted-color); margin-bottom:0.5rem;">Note: Cannot remove EPJs that are currently checked out.</p>
+                        <button id="removeEpjBtn" class="secondary" onclick="removeEpj()"><span>Remove EPJ</span></button>
+                    </div>
+                </div>
+            </article>
+
+            <article>
                 <h3><ins>Recent Maintenance Events</ins></h3>
                 <div class="overflow-auto">
                     <table id="maintenanceTable">
@@ -763,6 +786,98 @@
                         google.script.run.withSuccessHandler(handleSuccess).adminDeleteUser({token: _token, username: username});
                     }
                 };
+                
+                // EPJ Fleet Management Functions
+                window.loadEpjManagementList = function() {
+                    google.script.run
+                        .withSuccessHandler(function(epjs) {
+                            var select = document.getElementById('removeEpjSelect');
+                            if (!select) return;
+                            select.innerHTML = '<option value="" disabled selected>Select EPJ to remove...</option>';
+                            if (epjs && epjs.length > 0) {
+                                epjs.forEach(function(item) {
+                                    var opt = document.createElement('option');
+                                    opt.value = item.epj;
+                                    var statusText = item.status === 'Checked Out' ? ' (CHECKED OUT)' : '';
+                                    var storeText = item.storeOnly ? ' [Store Only]' : '';
+                                    opt.textContent = item.epj + statusText + storeText;
+                                    if (item.status === 'Checked Out') {
+                                        opt.disabled = true;
+                                    }
+                                    select.appendChild(opt);
+                                });
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            console.error('Failed to load EPJ list:', err);
+                        })
+                        .adminGetAllEpjs({token: _token});
+                };
+                
+                window.addNewEpj = function() {
+                    var epjInput = document.getElementById('newEpjNumber');
+                    var storeOnlyCheck = document.getElementById('newEpjStoreOnly');
+                    var epjNumber = epjInput ? epjInput.value.trim() : '';
+                    var storeOnly = storeOnlyCheck ? storeOnlyCheck.checked : false;
+                    
+                    if (!epjNumber) {
+                        alert('Please enter an EPJ number.');
+                        return;
+                    }
+                    
+                    var btn = document.getElementById('addEpjBtn');
+                    setButtonLoading(btn, true);
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            setButtonLoading(btn, false);
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = message;
+                            if (epjInput) epjInput.value = '';
+                            if (storeOnlyCheck) storeOnlyCheck.checked = false;
+                            loadDashboardData();
+                            loadEpjManagementList();
+                        })
+                        .withFailureHandler(function(err) {
+                            setButtonLoading(btn, false);
+                            alert('Error: ' + (err.message || 'Failed to add EPJ'));
+                        })
+                        .adminAddEpj({token: _token, epjNumber: epjNumber, storeOnly: storeOnly});
+                };
+                
+                window.removeEpj = function() {
+                    var select = document.getElementById('removeEpjSelect');
+                    var epjNumber = select ? select.value : '';
+                    
+                    if (!epjNumber) {
+                        alert('Please select an EPJ to remove.');
+                        return;
+                    }
+                    
+                    if (!confirm('Are you sure you want to permanently remove EPJ "' + epjNumber + '" from the system?\\n\\nThis action cannot be undone.')) {
+                        return;
+                    }
+                    
+                    var btn = document.getElementById('removeEpjBtn');
+                    setButtonLoading(btn, true);
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            setButtonLoading(btn, false);
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = message;
+                            loadDashboardData();
+                            loadEpjManagementList();
+                        })
+                        .withFailureHandler(function(err) {
+                            setButtonLoading(btn, false);
+                            alert('Error: ' + (err.message || 'Failed to remove EPJ'));
+                        })
+                        .adminRemoveEpj({token: _token, epjNumber: epjNumber});
+                };
+                
+                // Load EPJ list on page load
+                loadEpjManagementList();
             })();
         </script>
     </body>

@@ -286,6 +286,27 @@
                     }, 2000);
                 }
             }
+            
+            // Inactivity timeout - return to login after 2 minutes of no activity
+            var inactivityTimeout;
+            var INACTIVITY_LIMIT = 2 * 60 * 1000; // 2 minutes in milliseconds
+            
+            function resetInactivityTimer() {
+                clearTimeout(inactivityTimeout);
+                inactivityTimeout = setTimeout(function() {
+                    if (typeof logout === 'function') {
+                        logout();
+                    }
+                }, INACTIVITY_LIMIT);
+            }
+            
+            // Track user activity
+            ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(function(event) {
+                document.addEventListener(event, resetInactivityTimer, { passive: true });
+            });
+            
+            // Start the inactivity timer
+            resetInactivityTimer();
         })();
     </script>
 </body>
