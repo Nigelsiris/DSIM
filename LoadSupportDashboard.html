@@ -6,28 +6,318 @@
     <style>
         main { padding: 20px; }
         td { vertical-align: middle; }
+        
+        /* Search and filter section */
+        .filter-section {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        
+        .filter-section > div {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-section label {
+            margin-bottom: 0.25rem;
+        }
+        
+        .filter-section input,
+        .filter-section select {
+            margin-bottom: 0;
+        }
+        
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .status-available {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .status-checked-out {
+            background: #f44336;
+            color: white;
+        }
+        
+        .status-maintenance {
+            background: #ff9800;
+            color: white;
+        }
+        
+        /* Loading spinner for buttons */
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 1em;
+            height: 1em;
+            top: 50%;
+            left: 50%;
+            margin-top: -0.5em;
+            margin-left: -0.5em;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: btn-spin 0.6s linear infinite;
+        }
+        
+        .btn-loading span {
+            visibility: hidden;
+        }
+        
+        @keyframes btn-spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* EPJ count badge */
+        .epj-count {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            margin-left: 0.5rem;
+        }
+        
+        /* Table improvements */
+        #epjLocationTable tbody tr {
+            transition: background 0.2s;
+        }
+
+        #epjLocationTable tbody tr:hover {
+            background: var(--primary-focus);
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 2rem;
+            color: var(--muted-color);
+        }
+        
+        /* Tooltips */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--contrast);
+            color: var(--contrast-inverse);
+            padding: 0.4rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            margin-bottom: 4px;
+        }
+        [data-tooltip]:hover::after,
+        [data-tooltip]:focus::after {
+            opacity: 1;
+        }
+        
+        /* Empty State Styles */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--muted-color);
+        }
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        .empty-state h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--color);
+        }
+        .empty-state p {
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        
+        /* Bulk actions section */
+        .bulk-actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--card-background-color);
+            border-radius: 0.5rem;
+            border: 1px solid var(--muted-border-color);
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        
+        .bulk-actions.hidden {
+            display: none;
+        }
+        
+        .bulk-actions > div {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .bulk-actions label {
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+        
+        .bulk-actions select,
+        .bulk-actions button {
+            margin-bottom: 0;
+        }
+        
+        .selected-count {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        /* Checkbox styling */
+        #epjLocationTable input[type="checkbox"] {
+            width: 1.2rem;
+            height: 1.2rem;
+            cursor: pointer;
+        }
+        
+        #epjLocationTable th:first-child,
+        #epjLocationTable td:first-child {
+            width: 40px;
+            text-align: center;
+        }
+        
+        .row-selected {
+            background: var(--primary-focus) !important;
+        }
+        
+        /* Refresh header styling */
+        .refresh-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .refresh-header h4 {
+            margin: 0;
+        }
+        
+        .refresh-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .last-update {
+            font-size: 0.85rem;
+            color: var(--muted-color);
+        }
+        
+        /* Success flash animation */
+        @keyframes successFlash {
+            0% { background-color: rgba(76, 175, 80, 0.3); }
+            100% { background-color: transparent; }
+        }
+        
+        .update-success {
+            animation: successFlash 1.5s ease-out;
+        }
     </style>
 </head>
 <body>
     <main class="container">
-        <button class="secondary outline" onclick="logout()" style="position: absolute; top: 1rem; right: 1rem;">Logout</button>
+        <button class="contrast" onclick="logout()" style="position: absolute; top: 1rem; right: 1rem;">Logout</button>
         <h1 style="text-align:center;">EPJ Location Management</h1>
         <p>Welcome, <b><?!= username; ?></b>. Use this panel to update the location of any EPJ.</p>
 
         <article>
+            <div class="filter-section">
+                <div>
+                    <label for="searchEpj">Search EPJ</label>
+                    <input type="text" id="searchEpj" placeholder="Type to search EPJ..." autocomplete="off">
+                </div>
+                <div>
+                    <label for="filterStatus">Filter by Status</label>
+                    <select id="filterStatus">
+                        <option value="All">All Statuses</option>
+                        <option value="Available">Available</option>
+                        <option value="Checked Out">Checked Out</option>
+                        <option value="Maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filterLocation">Filter by Location</label>
+                    <select id="filterLocation">
+                        <option value="All">All Locations</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="refresh-header">
+                <h4>EPJ List <span id="epjCount" class="epj-count">0</span></h4>
+                <div class="refresh-controls">
+                    <span id="lastUpdate" class="last-update"></span>
+                    <button id="refreshBtn" class="outline secondary" style="margin:0; padding:0.25rem 0.75rem; font-size:0.85rem;" onclick="refreshData(true)">
+                        <span>⟳ Refresh</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Bulk Actions Section -->
+            <div id="bulkActions" class="bulk-actions hidden">
+                <div style="flex: 0 0 auto; min-width: auto;">
+                    <label>Selected</label>
+                    <p style="margin: 0;"><span id="selectedCount" class="selected-count">0</span> EPJ(s)</p>
+                </div>
+                <div>
+                    <label for="bulkZoneSelect">Set Location for Selected</label>
+                    <select id="bulkZoneSelect"></select>
+                </div>
+                <div style="flex: 0 0 auto; min-width: auto;">
+                    <label>&nbsp;</label>
+                    <button id="bulkUpdateBtn" onclick="bulkUpdateLocations()"><span>Update Selected</span></button>
+                </div>
+                <div style="flex: 0 0 auto; min-width: auto;">
+                    <label>&nbsp;</label>
+                    <button class="secondary" onclick="clearSelection()">Clear Selection</button>
+                </div>
+            </div>
+            
             <div class="overflow-auto">
                 <table id="epjLocationTable">
                     <thead>
                         <tr>
+                            <th><input type="checkbox" id="selectAll" title="Select All"></th>
                             <th>EPJ</th>
-                            <th>Current Status</th>
+                            <th>Status</th>
                             <th>Current Location</th>
                             <th>Set New Location</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- EPJ data will be populated here by the script -->
+                        <tr><td colspan="6" style="text-align:center;">Loading EPJ data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -35,80 +325,514 @@
         <p id="feedback" style="text-align:center; min-height: 20px;"></p>
     </main>
     <script>
-        const token = localStorage.getItem('sessionToken');
-        let epjStatuses = [];
-        let epjInfoMap = {};
-        let zoneOptionsHtml = '';
-
-        // Load data asynchronously
-        google.script.run
-            .withSuccessHandler(function(data) {
-                epjStatuses = data.epjStatuses;
-                epjInfoMap = data.epjInfoMap;
-                zoneOptionsHtml = data.zoneOptions;
-                buildTable();
-            })
-            .withFailureHandler(function(error) {
-                document.getElementById('feedback').innerText = 'Error loading data: ' + error.message;
-            })
-            .getLoadSupportData({token: token});
-
-        // Function to build the table when the page loads
-        function buildTable() {
-            const tableBody = document.querySelector('#epjLocationTable tbody');
-            tableBody.innerHTML = ''; // Clear existing rows
-
-            epjStatuses.forEach(item => {
-                const epjNumber = item.epj;
-                const currentStatus = item.status;
-                const currentLocation = epjInfoMap[epjNumber] ? epjInfoMap[epjNumber].location : 'Unknown';
-
-                // Create the zone dropdown for each row
-                const zoneSelectId = `zone-for-${epjNumber}`;
-                const zoneDropdown = `<select id="${zoneSelectId}">${zoneOptionsHtml}</select>`;
-
-                const rowHtml = `
-                    <tr>
-                        <td><strong>${epjNumber}</strong></td>
-                        <td>${currentStatus}</td>
-                        <td>${currentLocation}</td>
-                        <td>${zoneDropdown}</td>
-                        <td><button onclick="updateLocation('${epjNumber}')">Update</button></td>
-                    </tr>
-                `;
-                tableBody.innerHTML += rowHtml;
-
-                // Pre-select the current location in the dropdown
-                if (currentLocation) {
-                    const selectElement = document.getElementById(zoneSelectId);
-                    if(selectElement) {
-                       selectElement.value = currentLocation;
-                    }
+        (function() {
+            // Get token from multiple sources
+            var _token = null;
+            
+            // First try the server-side template variable
+            <?
+              if (typeof token !== 'undefined' && token) {
+                output.append('_token = "' + token + '";');
+              }
+            ?>
+            
+            // If template didn't work, try global sessionToken
+            if (!_token) {
+                if (typeof sessionToken !== 'undefined' && sessionToken) {
+                    _token = sessionToken;
                 }
-            });
-        }
+            }
+            
+            // Try localStorage as fallback
+            if (!_token) {
+                _token = localStorage.getItem('sessionToken');
+            }
+            
+            // Set global for other functions
+            window.sessionToken = _token;
+            
+            var epjStatuses = [];
+            var epjInfoMap = {};
+            var zoneOptionsHtml = '';
+            var zonesList = [];
+            var selectedEpjs = new Set();
+            var _isRefreshing = false;
+            var _refreshInProgress = false;
+            
+            // Centralized session error handler - auto-refreshes on token/permission errors
+            function handleSessionError(err) {
+                if (_isRefreshing) return true;
+                
+                var errorMsg = (err && err.message) ? err.message : String(err || '');
+                
+                // Only match specific session/permission errors - be conservative
+                var isSessionError = (
+                    errorMsg.indexOf('Permission denied') !== -1 ||
+                    errorMsg.indexOf('Invalid session') !== -1 ||
+                    errorMsg.indexOf('session expired') !== -1 ||
+                    errorMsg.indexOf('No session token') !== -1
+                );
+                
+                if (isSessionError) {
+                    _isRefreshing = true;
+                    if (window.refreshTimer) {
+                        clearInterval(window.refreshTimer);
+                        window.refreshTimer = null;
+                    }
+                    
+                    var feedback = document.getElementById('feedback');
+                    if (feedback) {
+                        feedback.innerHTML = '<strong style="color:orange;">Session expired - Refreshing page in 3 seconds...</strong>';
+                    }
+                    
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 3000);
+                    
+                    return true;
+                }
+                return false;
+            }
+            
+            // Update last refresh timestamp
+            function updateLastRefreshTime() {
+                var el = document.getElementById('lastUpdate');
+                if (el) {
+                    var now = new Date();
+                    el.textContent = 'Updated ' + now.toLocaleTimeString();
+                }
+            }
+            
+            // Refresh data function
+            window.refreshData = function(showLoading) {
+                if (!_token) {
+                    handleSessionError({message: 'No session token'});
+                    return;
+                }
+                
+                if (_refreshInProgress && !showLoading) return; // Skip if already in progress (unless manual)
+                _refreshInProgress = true;
+                
+                var btn = document.getElementById('refreshBtn');
+                if (showLoading && btn) {
+                    btn.classList.add('btn-loading');
+                    btn.disabled = true;
+                }
+                
+                google.script.run
+                    .withSuccessHandler(function(data) {
+                        _refreshInProgress = false;
+                        if (!data) {
+                            // Don't treat as session error - just log and skip
+                            console.log('No data received from server');
+                            if (btn) {
+                                btn.classList.remove('btn-loading');
+                                btn.disabled = false;
+                            }
+                            return;
+                        }
+                        try {
+                            epjStatuses = data.epjStatuses || [];
+                            epjInfoMap = data.epjInfoMap || {};
+                            zoneOptionsHtml = data.zoneOptions || '';
+                            
+                            // Update bulk zone dropdown
+                            var bulkZoneSelect = document.getElementById('bulkZoneSelect');
+                            if (bulkZoneSelect) {
+                                bulkZoneSelect.innerHTML = '<option value="">Select Location...</option>' + zoneOptionsHtml;
+                            }
+                            
+                            buildTable();
+                            updateLastRefreshTime();
+                        } catch(e) {
+                            console.error('Error updating data:', e);
+                        }
+                        
+                        if (btn) {
+                            btn.classList.remove('btn-loading');
+                            btn.disabled = false;
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        _refreshInProgress = false;
+                        if (handleSessionError(error)) return;
+                        document.getElementById('feedback').innerText = 'Error refreshing: ' + (error && error.message ? error.message : 'Unknown error');
+                        if (btn) {
+                            btn.classList.remove('btn-loading');
+                            btn.disabled = false;
+                        }
+                    })
+                    .getLoadSupportData({token: _token});
+            };
+            
+            // Clear previous timer if exists
+            if (window.refreshTimer) clearInterval(window.refreshTimer);
+            
+            // Auto-refresh every 30 seconds
+            window.refreshTimer = setInterval(function() {
+                refreshData(false);
+            }, 30000);
 
-        // Function to call the server to update a location
-        function updateLocation(epj) {
-            const selectId = `zone-for-${epj}`;
-            const newLocation = document.getElementById(selectId).value;
-            if (!newLocation) {
-                alert('Please select a new location.');
-                return;
+            // Load data asynchronously
+            google.script.run
+                .withSuccessHandler(function(data) {
+                    if (!data) {
+                        // Don't treat as session error - just show message
+                        console.log('No data received from server');
+                        document.getElementById('feedback').innerText = 'No data received. Please try refreshing.';
+                        return;
+                    }
+                    epjStatuses = data.epjStatuses || [];
+                    epjInfoMap = data.epjInfoMap || {};
+                    zoneOptionsHtml = data.zoneOptions || '';
+                    
+                    // Extract zones list for location filter
+                    var tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = zoneOptionsHtml;
+                    zonesList = Array.from(tempDiv.querySelectorAll('option')).map(function(opt) {
+                        return opt.value;
+                    });
+                    
+                    // Populate location filter dropdown
+                    var locationFilter = document.getElementById('filterLocation');
+                    if (locationFilter) {
+                        locationFilter.innerHTML = '<option value="All">All Locations</option>';
+                        zonesList.forEach(function(zone) {
+                            if (zone) {
+                                var opt = document.createElement('option');
+                                opt.value = zone;
+                                opt.textContent = zone;
+                                locationFilter.appendChild(opt);
+                            }
+                        });
+                    }
+                    
+                    // Populate bulk zone dropdown
+                    var bulkZoneSelect = document.getElementById('bulkZoneSelect');
+                    if (bulkZoneSelect) {
+                        bulkZoneSelect.innerHTML = '<option value="">Select Location...</option>' + zoneOptionsHtml;
+                    }
+                    
+                    buildTable();
+                    updateLastRefreshTime();
+                })
+                .withFailureHandler(function(error) {
+                    if (handleSessionError(error)) return;
+                    document.getElementById('feedback').innerText = 'Error loading data: ' + (error.message || 'Unknown error');
+                    var tableBody = document.querySelector('#epjLocationTable tbody');
+                    if (tableBody) tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Failed to load data. Please refresh the page.</td></tr>';
+                })
+                .getLoadSupportData({token: _token});
+
+            // Function to get status badge HTML
+            function getStatusBadge(status) {
+                var statusClass = 'status-available';
+                if (status === 'Checked Out') statusClass = 'status-checked-out';
+                else if (status === 'Maintenance') statusClass = 'status-maintenance';
+                return '<span class="status-badge ' + statusClass + '">' + status + '</span>';
             }
 
-            document.getElementById('feedback').innerText = `Updating location for ${epj}...`;
-            google.script.run
-                .withSuccessHandler(message => {
-                    document.getElementById('feedback').innerText = message;
-                    // Refresh the page to show the new location after a short delay
-                    setTimeout(() => window.location.reload(), 2000);
-                })
-                .updateEpjLocation({ token: token, epj: epj, newLocation: newLocation });
-        }
+            // Function to build the table with current filters
+            function buildTable() {
+                var tableBody = document.querySelector('#epjLocationTable tbody');
+                if (!tableBody) return;
+                tableBody.innerHTML = '';
 
-        // Build the table on page load
-        buildTable();
+                var searchTerm = (document.getElementById('searchEpj').value || '').toLowerCase().trim();
+                var statusFilter = document.getElementById('filterStatus').value;
+                var locationFilter = document.getElementById('filterLocation').value;
+
+                var filteredEpjs = epjStatuses.filter(function(item) {
+                    var epjNumber = item.epj || '';
+                    var currentStatus = item.status || '';
+                    var currentLocation = epjInfoMap[epjNumber] ? epjInfoMap[epjNumber].location : 'Unknown';
+                    
+                    // Search filter
+                    var matchesSearch = !searchTerm || epjNumber.toLowerCase().indexOf(searchTerm) !== -1;
+                    
+                    // Status filter
+                    var matchesStatus = statusFilter === 'All' || currentStatus === statusFilter;
+                    
+                    // Location filter
+                    var matchesLocation = locationFilter === 'All' || currentLocation === locationFilter;
+                    
+                    return matchesSearch && matchesStatus && matchesLocation;
+                });
+
+                // Update count
+                var countEl = document.getElementById('epjCount');
+                if (countEl) countEl.textContent = filteredEpjs.length;
+
+                if (filteredEpjs.length === 0) {
+                    var emptyMessage = allEpjStatuses.length === 0 
+                        ? '<div class="empty-state"><div class="empty-state-icon">🛠️</div><h4>No EPJs in System</h4><p>No EPJs have been configured yet. Add EPJs to the EPJ Status sheet in your spreadsheet.</p></div>'
+                        : '<div class="empty-state"><div class="empty-state-icon">🔍</div><h4>No Matching EPJs</h4><p>Try adjusting your search or filters to find what you\'re looking for.</p></div>';
+                    tableBody.innerHTML = '<tr><td colspan="6">' + emptyMessage + '</td></tr>';
+                    return;
+                }
+
+                filteredEpjs.forEach(function(item) {
+                    var epjNumber = item.epj;
+                    var currentStatus = item.status;
+                    var currentLocation = epjInfoMap[epjNumber] ? epjInfoMap[epjNumber].location : 'Unknown';
+
+                    // Create the zone dropdown for each row
+                    var zoneSelectId = 'zone-for-' + epjNumber;
+                    var zoneDropdown = '<select id="' + zoneSelectId + '">' + zoneOptionsHtml + '</select>';
+                    
+                    // Check if this EPJ is selected
+                    var isSelected = selectedEpjs.has(epjNumber);
+
+                    var row = document.createElement('tr');
+                    row.id = 'row-' + epjNumber;
+                    if (isSelected) row.classList.add('row-selected');
+                    row.innerHTML = 
+                        '<td><input type="checkbox" class="epj-checkbox" data-epj="' + epjNumber + '" ' + (isSelected ? 'checked' : '') + '></td>' +
+                        '<td><strong>' + epjNumber + '</strong></td>' +
+                        '<td>' + getStatusBadge(currentStatus) + '</td>' +
+                        '<td>' + currentLocation + '</td>' +
+                        '<td>' + zoneDropdown + '</td>' +
+                        '<td><button id="btn-' + epjNumber + '" onclick="updateLocation(\'' + epjNumber + '\')"><span>Update</span></button></td>';
+                    
+                    tableBody.appendChild(row);
+
+                    // Pre-select the current location in the dropdown
+                    if (currentLocation) {
+                        var selectElement = document.getElementById(zoneSelectId);
+                        if (selectElement) {
+                           selectElement.value = currentLocation;
+                        }
+                    }
+                });
+                
+                // Add checkbox event listeners
+                document.querySelectorAll('.epj-checkbox').forEach(function(checkbox) {
+                    checkbox.addEventListener('change', function() {
+                        var epj = this.dataset.epj;
+                        var row = document.getElementById('row-' + epj);
+                        if (this.checked) {
+                            selectedEpjs.add(epj);
+                            if (row) row.classList.add('row-selected');
+                        } else {
+                            selectedEpjs.delete(epj);
+                            if (row) row.classList.remove('row-selected');
+                        }
+                        updateBulkActionsVisibility();
+                        updateSelectAllState();
+                    });
+                });
+                
+                updateSelectAllState();
+                
+                var feedback = document.getElementById('feedback');
+                if (feedback) feedback.innerText = '';
+            }
+            
+            // Update select all checkbox state
+            function updateSelectAllState() {
+                var selectAllCheckbox = document.getElementById('selectAll');
+                var checkboxes = document.querySelectorAll('.epj-checkbox');
+                if (selectAllCheckbox && checkboxes.length > 0) {
+                    var checkedCount = document.querySelectorAll('.epj-checkbox:checked').length;
+                    selectAllCheckbox.checked = checkedCount === checkboxes.length;
+                    selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+                }
+            }
+            
+            // Show/hide bulk actions based on selection
+            function updateBulkActionsVisibility() {
+                var bulkActions = document.getElementById('bulkActions');
+                var selectedCountEl = document.getElementById('selectedCount');
+                if (bulkActions) {
+                    if (selectedEpjs.size > 0) {
+                        bulkActions.classList.remove('hidden');
+                        if (selectedCountEl) selectedCountEl.textContent = selectedEpjs.size;
+                    } else {
+                        bulkActions.classList.add('hidden');
+                    }
+                }
+            }
+            
+            // Select All checkbox handler
+            document.getElementById('selectAll').addEventListener('change', function() {
+                var checkboxes = document.querySelectorAll('.epj-checkbox');
+                var isChecked = this.checked;
+                checkboxes.forEach(function(checkbox) {
+                    checkbox.checked = isChecked;
+                    var epj = checkbox.dataset.epj;
+                    var row = document.getElementById('row-' + epj);
+                    if (isChecked) {
+                        selectedEpjs.add(epj);
+                        if (row) row.classList.add('row-selected');
+                    } else {
+                        selectedEpjs.delete(epj);
+                        if (row) row.classList.remove('row-selected');
+                    }
+                });
+                updateBulkActionsVisibility();
+            });
+            
+            // Clear selection
+            window.clearSelection = function() {
+                selectedEpjs.clear();
+                document.querySelectorAll('.epj-checkbox').forEach(function(checkbox) {
+                    checkbox.checked = false;
+                    var row = document.getElementById('row-' + checkbox.dataset.epj);
+                    if (row) row.classList.remove('row-selected');
+                });
+                document.getElementById('selectAll').checked = false;
+                document.getElementById('selectAll').indeterminate = false;
+                updateBulkActionsVisibility();
+            };
+            
+            // Bulk update locations
+            window.bulkUpdateLocations = function() {
+                var newLocation = document.getElementById('bulkZoneSelect').value;
+                if (!newLocation) {
+                    alert('Please select a location for the selected EPJs.');
+                    return;
+                }
+                
+                if (selectedEpjs.size === 0) {
+                    alert('No EPJs selected.');
+                    return;
+                }
+                
+                var epjsToUpdate = Array.from(selectedEpjs);
+                var totalCount = epjsToUpdate.length;
+                var completedCount = 0;
+                var errors = [];
+                
+                // Show loading state
+                var bulkBtn = document.getElementById('bulkUpdateBtn');
+                if (bulkBtn) {
+                    bulkBtn.classList.add('btn-loading');
+                    bulkBtn.disabled = true;
+                }
+                
+                document.getElementById('feedback').innerText = 'Updating ' + totalCount + ' EPJ(s)...';
+                
+                // Update all selected EPJs
+                epjsToUpdate.forEach(function(epj) {
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            completedCount++;
+                            checkBulkComplete();
+                        })
+                        .withFailureHandler(function(error) {
+                            if (handleSessionError(error)) return;
+                            completedCount++;
+                            errors.push(epj + ': ' + (error.message || 'Unknown error'));
+                            checkBulkComplete();
+                        })
+                        .updateEpjLocation({ token: _token, epj: epj, newLocation: newLocation });
+                });
+                
+                function checkBulkComplete() {
+                    if (completedCount === totalCount) {
+                        // All done
+                        if (errors.length > 0) {
+                            document.getElementById('feedback').innerHTML = 
+                                '<span style="color:orange;">Updated ' + (totalCount - errors.length) + ' of ' + totalCount + ' EPJ(s). ' +
+                                errors.length + ' error(s).</span>';
+                        } else {
+                            document.getElementById('feedback').innerHTML = 
+                                '<span style="color:green;">\u2713 Successfully updated ' + totalCount + ' EPJ(s) to ' + newLocation + '.</span>';
+                        }
+                        
+                        // Clear selection
+                        selectedEpjs.clear();
+                        updateBulkActionsVisibility();
+                        document.getElementById('selectAll').checked = false;
+                        document.getElementById('selectAll').indeterminate = false;
+                        
+                        // Reset bulk zone dropdown
+                        var bulkZoneSelect = document.getElementById('bulkZoneSelect');
+                        if (bulkZoneSelect) bulkZoneSelect.value = '';
+                        
+                        // Refresh data
+                        setTimeout(function() {
+                            refreshData(false);
+                            if (bulkBtn) {
+                                bulkBtn.classList.remove('btn-loading');
+                                bulkBtn.disabled = false;
+                            }
+                        }, 500);
+                    }
+                }
+            };
+
+            // Debounce utility for search input
+            let searchDebounceTimer = null;
+            function debouncedBuildTable() {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(buildTable, 300);
+            }
+            
+            // Add event listeners for filters
+            document.getElementById('searchEpj').addEventListener('input', debouncedBuildTable);
+            document.getElementById('filterStatus').addEventListener('change', buildTable);
+            document.getElementById('filterLocation').addEventListener('change', buildTable);
+
+            // Function to call the server to update a location
+            window.updateLocation = function(epj) {
+                var selectId = 'zone-for-' + epj;
+                var selectEl = document.getElementById(selectId);
+                var newLocation = selectEl ? selectEl.value : '';
+                if (!newLocation) {
+                    alert('Please select a new location.');
+                    return;
+                }
+
+                // Show loading state on button
+                var btn = document.getElementById('btn-' + epj);
+                if (btn) {
+                    btn.classList.add('btn-loading');
+                    btn.disabled = true;
+                }
+
+                document.getElementById('feedback').innerText = 'Updating location for ' + epj + '...';
+                google.script.run
+                    .withSuccessHandler(function(message) {
+                        document.getElementById('feedback').innerHTML = '<span style="color:green;">\u2713 ' + message + '</span>';
+                        
+                        // Flash the row to show success
+                        var row = document.getElementById('row-' + epj);
+                        if (row) {
+                            row.classList.add('update-success');
+                            setTimeout(function() {
+                                row.classList.remove('update-success');
+                            }, 1500);
+                        }
+                        
+                        // Refresh data after short delay
+                        setTimeout(function() {
+                            refreshData(false);
+                            if (btn) {
+                                btn.classList.remove('btn-loading');
+                                btn.disabled = false;
+                            }
+                        }, 500);
+                    })
+                    .withFailureHandler(function(error) {
+                        if (handleSessionError(error)) return;
+                        document.getElementById('feedback').innerHTML = '<span style="color:red;">Error: ' + (error.message || 'Unknown error') + '</span>';
+                        if (btn) {
+                            btn.classList.remove('btn-loading');
+                            btn.disabled = false;
+                        }
+                    })
+                    .updateEpjLocation({ token: _token, epj: epj, newLocation: newLocation });
+            };
+
+            window.logout = function() {
+                if (window.refreshTimer) clearInterval(window.refreshTimer);
+                google.script.run.withSuccessHandler(function() {
+                    var mainEl = document.querySelector('main');
+                    if (mainEl) mainEl.innerHTML = '<h1>You have been logged out.</h1>';
+                }).logoutUser({token: _token});
+            };
+        })();
     </script>
 </body>
 </html>

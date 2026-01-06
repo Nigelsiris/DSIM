@@ -121,6 +121,51 @@
             width: 40px;
             text-align: center;
         }
+        /* Tooltips */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--contrast);
+            color: var(--contrast-inverse);
+            padding: 0.4rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            margin-bottom: 4px;
+        }
+        [data-tooltip]:hover::after,
+        [data-tooltip]:focus::after {
+            opacity: 1;
+        }
+        /* Empty State Styles */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--muted-color);
+        }
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        .empty-state h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--color);
+        }
+        .empty-state p {
+            margin: 0;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -154,7 +199,7 @@
 
         <!-- Action Bar -->
         <div class="action-bar">
-            <input type="search" id="searchInput" placeholder="🔍 Search users..." oninput="filterUsers()">
+            <input type="search" id="searchInput" placeholder="🔍 Search users...">
             <select id="roleFilter" onchange="filterUsers()">
                 <option value="">All Roles</option>
                 <option value="Admin">Admin</option>
@@ -164,9 +209,9 @@
             <select id="carrierFilter" onchange="filterUsers()">
                 <option value="">All Carriers</option>
             </select>
-            <button onclick="toggleSelectAll()">Select All</button>
-            <button onclick="exportUsers()" class="secondary">📥 Export CSV</button>
-            <button onclick="refreshUsers()" class="secondary outline">🔄 Refresh</button>
+            <button onclick="toggleSelectAll()" data-tooltip="Select/deselect all visible users">Select All</button>
+            <button onclick="exportUsers()" class="secondary" data-tooltip="Download filtered users as CSV">📥 Export CSV</button>
+            <button onclick="refreshUsers()" class="secondary outline" data-tooltip="Reload user list from server">🔄 Refresh</button>
         </div>
 
         <!-- Bulk Actions -->
@@ -179,9 +224,9 @@
                     <option value="Driver">Driver</option>
                     <option value="Load Support">Load Support</option>
                 </select>
-                <button onclick="applyBulkRoleChange()" class="secondary">Apply Role Change</button>
-                <button onclick="bulkDeleteUsers()" class="contrast">🗑️ Delete Selected</button>
-                <button onclick="clearSelection()" class="secondary outline">Clear Selection</button>
+                <button onclick="applyBulkRoleChange()" class="secondary" data-tooltip="Change role for all selected users">Apply Role Change</button>
+                <button onclick="bulkDeleteUsers()" class="contrast" data-tooltip="Permanently delete all selected users">🗑️ Delete Selected</button>
+                <button onclick="clearSelection()" class="secondary outline" data-tooltip="Deselect all users">Clear Selection</button>
             </div>
         </div>
 
@@ -218,6 +263,16 @@
         window.addEventListener('DOMContentLoaded', function() {
             showFeedback('Loading users...', 'info');
             loadUsers();
+            
+            // Debounced search input
+            var searchTimeout;
+            var searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(filterUsers, 300);
+                });
+            }
         });
 
         function showFeedback(message, type = 'info') {
@@ -359,7 +414,10 @@
             tbody.innerHTML = '';
 
             if (filteredUsers.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No users found</td></tr>';
+                var emptyMessage = allUsers.length === 0 
+                    ? '<div class="empty-state"><div class="empty-state-icon">👥</div><h4>No Users Found</h4><p>No users have been created yet. Users are added when they register through the login page.</p></div>'
+                    : '<div class="empty-state"><div class="empty-state-icon">🔍</div><h4>No Matching Users</h4><p>Try adjusting your search or filters to find what you\'re looking for.</p></div>';
+                tbody.innerHTML = '<tr><td colspan="5">' + emptyMessage + '</td></tr>';
                 return;
             }
 
@@ -379,9 +437,9 @@
                     <td>${roleBadge}</td>
                     <td>${escapeHtml(user.carrier || 'N/A')}</td>
                     <td class="action-buttons">
-                        <button class="secondary" onclick="editUser('${escapeHtml(user.username)}', '${escapeHtml(user.role)}', '${escapeHtml(user.carrier || '')}')">✏️ Edit</button>
-                        <button class="secondary outline" onclick="resetPassword('${escapeHtml(user.username)}')">🔑 Reset</button>
-                        <button class="contrast outline" onclick="deleteUser('${escapeHtml(user.username)}')">🗑️ Delete</button>
+                        <button class="secondary" onclick="editUser('${escapeHtml(user.username)}', '${escapeHtml(user.role)}', '${escapeHtml(user.carrier || '')}')" data-tooltip="Edit role and carrier">✏️ Edit</button>
+                        <button class="secondary outline" onclick="resetPassword('${escapeHtml(user.username)}')" data-tooltip="Set a new password">🔑 Reset</button>
+                        <button class="contrast outline" onclick="deleteUser('${escapeHtml(user.username)}')" data-tooltip="Permanently remove user">🗑️ Delete</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -454,18 +512,32 @@
         }
 
         function editUser(username, currentRole, currentCarrier) {
-            const newRole = prompt(`Enter new role for "${username}": (Current: ${currentRole})`, currentRole);
+            const newUsername = prompt(`Enter new username for "${username}":\n(Leave unchanged or enter new username)`, username);
+            if (newUsername === null) return;
+            if (!newUsername.trim()) {
+                showFeedback('Username cannot be empty', 'error');
+                return;
+            }
+            const newRole = prompt(`Enter new role for "${newUsername}":\n(Admin, Driver, or Load Support)`, currentRole);
             if (newRole === null) return;
-            const newCarrier = prompt(`Enter new carrier for "${username}": (Current: ${currentCarrier})`, currentCarrier);
+            if (!['Admin', 'Driver', 'Load Support'].includes(newRole)) {
+                showFeedback('Invalid role. Must be Admin, Driver, or Load Support', 'error');
+                return;
+            }
+            const newCarrier = prompt(`Enter new carrier for "${newUsername}":\n(Optional - press OK to keep current)`, currentCarrier);
             if (newCarrier !== null) {
                 showFeedback('Updating user...', 'info');
                 google.script.run
-                    .withSuccessHandler(() => {
-                        showFeedback(`User "${username}" updated successfully`, 'success');
-                        loadUsers();
+                    .withSuccessHandler((result) => {
+                        if (result && result.startsWith('Error:')) {
+                            showFeedback(result, 'error');
+                        } else {
+                            showFeedback(result || `User updated successfully`, 'success');
+                            loadUsers();
+                        }
                     })
                     .withFailureHandler(err => showFeedback('Error: ' + (err.message || err), 'error'))
-                    .adminEditUser({token: sessionToken, username: username, role: newRole, carrier: newCarrier});
+                    .adminEditUser({token: sessionToken, username: username, newUsername: newUsername.trim(), role: newRole, carrier: newCarrier});
             }
         }
 

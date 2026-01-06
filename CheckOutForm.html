@@ -47,9 +47,57 @@
         .btn-loading span {
             visibility: hidden;
         }
-        
+
         @keyframes btn-spin {
             to { transform: rotate(360deg); }
+        }
+        
+        /* Overspill styling */
+        .overspill-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+        }
+        
+        .overspill-toggle:hover {
+            background: #ffe0b2;
+        }
+        
+        .overspill-toggle input[type="checkbox"] {
+            width: 1.5rem;
+            height: 1.5rem;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .overspill-toggle label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #e65100;
+        }
+        
+        .overspill-toggle small {
+            color: #f57c00;
+        }
+        
+        .overspill-active {
+            background: #ffcc80;
+            border-color: #e65100;
+        }
+        
+        .field-optional {
+            opacity: 0.6;
+        }
+        
+        .field-optional input {
+            background: var(--pico-muted-border-color);
         }
     </style>
 </head>
@@ -65,28 +113,39 @@
             <p>Welcome, <b><?!= username; ?></b>. Please confirm your details to check out an EPJ.</p>
 
             <form id="checkOutForm">
+                <!-- Overspill Toggle -->
+                <div class="overspill-toggle" id="overspillToggle">
+                    <input type="checkbox" id="overspillCheckbox" name="overspill">
+                    <div>
+                        <label for="overspillCheckbox">Overspill / No Load Assigned</label><br>
+                        <small>Check this if you don't have an assigned load yet</small>
+                    </div>
+                </div>
+                
                 <div class="grid">
                     <label>Driver Name<input type="text" id="driverName" name="driverName" value="<?!= username; ?>" readonly></label>
-                    <label>Truck Number<input type="text" id="truckNumber" name="truckNumber" required></label>
+                    <label id="truckLabel">Truck Number<input type="text" id="truckNumber" name="truckNumber" required></label>
                 </div>
                 <div class="grid">
-                    <label>Trailer Number<input type="text" id="trailerNumber" name="trailerNumber" required></label>
-                    <label>Route<input type="text" id="route" name="route" required></label>
+                    <label id="trailerLabel">Trailer Number<input type="text" id="trailerNumber" name="trailerNumber" required></label>
+                    <label id="routeLabel">Route (Store Numbers)<input type="text" id="route" name="route" placeholder="1234 / 5678 / 9012" required></label>
                 </div>
                 
                 <hr>
 
-                <label for="zoneFilter">Filter by Zone</label>
-                <select id="zoneFilter" disabled>
-                    <option value="All" selected>Loading zones...</option>
-                </select>
+                <div id="epjSection">
+                    <label for="zoneFilter">Filter by Zone</label>
+                    <select id="zoneFilter" disabled>
+                        <option value="All" selected>Loading zones...</option>
+                    </select>
 
-                <label for="epjNumber">Select EPJ</label>
-                <select id="epjNumber" name="epjNumber" required disabled>
-                    <option value="" disabled selected>Loading...</option>
-                </select>
+                    <label for="epjNumber">Select EPJ</label>
+                    <select id="epjNumber" name="epjNumber" required disabled>
+                        <option value="" disabled selected>Loading...</option>
+                    </select>
 
-                <div id="epjInfoDisplay"><small>Loading equipment data...</small></div>
+                    <div id="epjInfoDisplay"><small>Loading equipment data...</small></div>
+                </div>
 
                 <label for="faultReport">Pre-Trip: Report any existing issues (optional)</label>
                 <textarea id="faultReport" name="faultReport" placeholder="e.g., Fork is slightly bent, battery cover is cracked..."></textarea>
@@ -112,6 +171,79 @@
             // Disable form until data loads
             if (submitBtn) submitBtn.disabled = true;
             if (zoneFilter) zoneFilter.disabled = true;
+
+            // Route input auto-formatting (adds slashes after every 4 digits)
+            var routeInput = document.getElementById('route');
+            if (routeInput) {
+                routeInput.addEventListener('input', function(e) {
+                    // Don't auto-format if overspill is checked
+                    var overspillCheckbox = document.getElementById('overspillCheckbox');
+                    if (overspillCheckbox && overspillCheckbox.checked) return;
+                    
+                    var value = e.target.value;
+                    // Remove all non-digits
+                    var digitsOnly = value.replace(/\D/g, '');
+                    // Split into groups of 4
+                    var formatted = '';
+                    for (var i = 0; i < digitsOnly.length; i++) {
+                        if (i > 0 && i % 4 === 0) {
+                            formatted += ' / ';
+                        }
+                        formatted += digitsOnly[i];
+                    }
+                    e.target.value = formatted;
+                });
+            }
+            
+            // Overspill toggle functionality
+            var overspillCheckbox = document.getElementById('overspillCheckbox');
+            var overspillToggle = document.getElementById('overspillToggle');
+            var truckInput = document.getElementById('truckNumber');
+            var trailerInput = document.getElementById('trailerNumber');
+            var truckLabel = document.getElementById('truckLabel');
+            var trailerLabel = document.getElementById('trailerLabel');
+            var routeLabel = document.getElementById('routeLabel');
+            var epjSection = document.getElementById('epjSection');
+            
+            if (overspillCheckbox) {
+                overspillCheckbox.addEventListener('change', function() {
+                    var isOverspill = this.checked;
+                    
+                    // Toggle visual state
+                    if (overspillToggle) {
+                        if (isOverspill) {
+                            overspillToggle.classList.add('overspill-active');
+                        } else {
+                            overspillToggle.classList.remove('overspill-active');
+                        }
+                    }
+                    
+                    // Update route field
+                    if (routeInput) {
+                        if (isOverspill) {
+                            routeInput.value = 'OS / Overspill';
+                            routeInput.readOnly = true;
+                        } else {
+                            routeInput.value = '';
+                            routeInput.readOnly = false;
+                            routeInput.placeholder = '1234 / 5678 / 9012';
+                        }
+                    }
+                    
+                    // Hide/show EPJ selection for overspill
+                    if (epjSection) {
+                        epjSection.style.display = isOverspill ? 'none' : 'block';
+                    }
+                    
+                    // Update EPJ select required attribute
+                    if (epjSelect) {
+                        epjSelect.required = !isOverspill;
+                    }
+                    
+                    // Update route label styling only
+                    if (routeLabel) routeLabel.classList.toggle('field-optional', isOverspill);
+                });
+            }
 
             // Load data asynchronously
             google.script.run
@@ -231,16 +363,19 @@
             if (checkOutForm) {
                 checkOutForm.addEventListener('submit', function(e) {
                     e.preventDefault();
+                    var isOverspill = overspillCheckbox && overspillCheckbox.checked;
                     var formData = {
                         token: _token,
                         driverName: document.getElementById('driverName') ? document.getElementById('driverName').value : '',
                         truckNumber: document.getElementById('truckNumber') ? document.getElementById('truckNumber').value : '',
                         trailerNumber: document.getElementById('trailerNumber') ? document.getElementById('trailerNumber').value : '',
                         route: document.getElementById('route') ? document.getElementById('route').value : '',
-                        epjNumber: epjSelect ? epjSelect.value : '',
-                        faultReport: document.getElementById('faultReport') ? document.getElementById('faultReport').value : ''
+                        epjNumber: isOverspill ? '' : (epjSelect ? epjSelect.value : ''),
+                        faultReport: document.getElementById('faultReport') ? document.getElementById('faultReport').value : '',
+                        isOverspill: isOverspill
                     };
-                    if (!formData.epjNumber) { alert('Please select an EPJ.'); return; }
+                    // Only require EPJ if not overspill
+                    if (!isOverspill && !formData.epjNumber) { alert('Please select an EPJ.'); return; }
                     
                     // Show loading state on button
                     if (submitBtn) {

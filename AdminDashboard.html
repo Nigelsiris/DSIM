@@ -18,9 +18,11 @@
                 user-select: none;
             }
             
-            .epj-card:hover {
+            .epj-card:hover, .epj-card:focus {
                 transform: translateY(-2px);
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                outline: 2px solid var(--primary);
+                outline-offset: 2px;
             }
             
             .epj-card.store-only::after {
@@ -149,6 +151,353 @@
             @keyframes btn-spin {
                 to { transform: rotate(360deg); }
             }
+            
+            /* EPJ Swap Modal */
+            .modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 3000;
+            }
+            
+            .modal-overlay.active {
+                display: flex;
+            }
+            
+            .modal-content {
+                background: var(--card-background-color);
+                padding: 2rem;
+                border-radius: 0.5rem;
+                max-width: 500px;
+                width: 90%;
+                max-height: 90vh;
+                overflow-y: auto;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            }
+            
+            .modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1rem;
+            }
+            
+            .modal-header h3 {
+                margin: 0;
+            }
+            
+            .modal-close {
+                background: none;
+                border: none;
+                font-size: 1.5rem;
+                cursor: pointer;
+                padding: 0;
+                color: var(--muted-color);
+            }
+            
+            .modal-close:hover {
+                color: var(--primary);
+            }
+            
+            .current-epj-info {
+                background: #ffebee;
+                border: 1px solid #ef5350;
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            
+            .current-epj-info strong {
+                color: #c62828;
+            }
+            
+            .new-epj-section {
+                background: #e8f5e9;
+                border: 1px solid #66bb6a;
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            
+            .new-epj-section strong {
+                color: #2e7d32;
+            }
+            
+            /* Checkbox fix for all checkboxes in the dashboard */
+            input[type="checkbox"] {
+                width: 1.25rem !important;
+                height: 1.25rem !important;
+                min-width: 1.25rem;
+                cursor: pointer;
+                margin: 0;
+                flex-shrink: 0;
+            }
+            
+            /* Compact table styling for Live Checkouts */
+            #activeCheckoutsTable {
+                font-size: 0.9rem;
+            }
+            #activeCheckoutsTable th,
+            #activeCheckoutsTable td {
+                padding: 0.4rem 0.5rem;
+                vertical-align: middle;
+            }
+            #activeCheckoutsTable th {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.02em;
+                background: var(--table-border-color);
+            }
+            #activeCheckoutsTable td button {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+                margin: 0 0.15rem;
+            }
+            #activeCheckoutsTable .epj-badge {
+                display: inline-block;
+                background: var(--primary);
+                color: white;
+                padding: 0.15rem 0.4rem;
+                border-radius: 0.25rem;
+                font-weight: 600;
+                font-size: 0.85rem;
+            }
+            #activeCheckoutsTable .epj-badge.overspill {
+                background: #9c27b0;
+            }
+            #activeCheckoutsTable .truck-trailer {
+                font-family: monospace;
+                font-size: 0.85rem;
+            }
+            #activeCheckoutsTable .checkout-type {
+                display: inline-block;
+                padding: 0.1rem 0.35rem;
+                border-radius: 0.2rem;
+                font-size: 0.7rem;
+                font-weight: 600;
+                text-transform: uppercase;
+            }
+            #activeCheckoutsTable .checkout-type.fresh {
+                background: #e3f2fd;
+                color: #1565c0;
+            }
+            #activeCheckoutsTable .checkout-type.swap {
+                background: #fff3e0;
+                color: #e65100;
+            }
+            #activeCheckoutsTable .worked-checkbox {
+                width: 1.1rem !important;
+                height: 1.1rem !important;
+                cursor: pointer;
+                margin: 0 auto;
+                display: block;
+            }
+            #activeCheckoutsTable .worked-cell {
+                text-align: center;
+            }
+            #activeCheckoutsTable tr.is-worked {
+                background: rgba(76, 175, 80, 0.1);
+            }
+            
+            /* EPJ Card driver info */
+            .epj-card .driver-info {
+                font-size: 0.65rem;
+                margin-top: 0.15rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                opacity: 0.85;
+            }
+            .epj-card.checked-out {
+                background: rgba(244, 67, 54, 0.08);
+            }
+            .epj-card.maintenance {
+                background: rgba(255, 152, 0, 0.08);
+            }
+            
+            /* Tab Navigation */
+            .tab-nav {
+                display: flex;
+                gap: 0;
+                border-bottom: 2px solid var(--muted-border-color);
+                margin-bottom: 1.5rem;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .tab-btn {
+                padding: 0.75rem 1.25rem;
+                border: none;
+                background: none;
+                cursor: pointer;
+                font-size: 0.95rem;
+                font-weight: 500;
+                color: var(--muted-color);
+                border-bottom: 3px solid transparent;
+                margin-bottom: -2px;
+                white-space: nowrap;
+                transition: color 0.2s, border-color 0.2s;
+            }
+            .tab-btn:hover {
+                color: var(--primary);
+            }
+            .tab-btn.active {
+                color: var(--primary);
+                border-bottom-color: var(--primary);
+            }
+            .tab-content {
+                display: none;
+            }
+            .tab-content.active {
+                display: block;
+            }
+            
+            /* Tooltips */
+            [data-tooltip] {
+                position: relative;
+            }
+            [data-tooltip]::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--contrast);
+                color: var(--contrast-inverse);
+                padding: 0.4rem 0.6rem;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                white-space: nowrap;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s;
+                z-index: 1000;
+                margin-bottom: 4px;
+            }
+            [data-tooltip]:hover::after,
+            [data-tooltip]:focus::after {
+                opacity: 1;
+            }
+            
+            /* Empty State Styles */
+            .empty-state {
+                text-align: center;
+                padding: 3rem 1rem;
+                color: var(--muted-color);
+            }
+            .empty-state-icon {
+                font-size: 3rem;
+                margin-bottom: 1rem;
+                opacity: 0.5;
+            }
+            .empty-state h4 {
+                margin: 0 0 0.5rem 0;
+                color: var(--color);
+            }
+            .empty-state p {
+                margin: 0;
+                font-size: 0.9rem;
+            }
+            
+            /* Compact table mode */
+            .compact-table th,
+            .compact-table td {
+                padding: 0.35rem 0.5rem;
+                font-size: 0.85rem;
+            }
+            
+            /* Notification Preferences Panel */
+            .notification-prefs {
+                background: var(--card-background-color);
+                border: 1px solid var(--muted-border-color);
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin-bottom: 1rem;
+                max-width: 600px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .notification-prefs h4 {
+                margin: 0 0 0.75rem 0;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 1rem;
+            }
+            .pref-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.75rem 0;
+                border-bottom: 1px solid var(--muted-border-color);
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+            .pref-row:last-child {
+                border-bottom: none;
+            }
+            .pref-row label {
+                margin: 0;
+                cursor: pointer;
+                flex: 1;
+                min-width: 150px;
+                font-size: 0.9rem;
+            }
+            .pref-row select {
+                width: auto;
+                min-width: 140px;
+                margin: 0;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.85rem;
+            }
+            .pref-row input[type="range"] {
+                width: 140px;
+                margin: 0;
+            }
+            .notification-prefs .test-buttons {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 1rem;
+                padding-top: 0.75rem;
+                border-top: 1px solid var(--muted-border-color);
+            }
+            .notification-prefs .test-buttons button {
+                flex: 1;
+                min-width: 120px;
+                padding: 0.5rem 0.75rem;
+                font-size: 0.85rem;
+            }
+            
+            /* Mobile-friendly touch targets */
+            @media (max-width: 768px) {
+                .epj-card {
+                    padding: 14px 10px;
+                    min-height: 60px;
+                }
+                .tab-btn {
+                    padding: 1rem 1rem;
+                    font-size: 0.9rem;
+                }
+                .context-menu a {
+                    padding: 12px 16px;
+                }
+                #activeCheckoutsTable th,
+                #activeCheckoutsTable td {
+                    padding: 0.6rem 0.4rem;
+                }
+                button, .btn {
+                    min-height: 44px;
+                }
+                input, select {
+                    min-height: 44px;
+                }
+            }
         </style>
     </head>
     <body>
@@ -157,91 +506,134 @@
                 <button class="contrast" onclick="logout()">Logout</button>
             </div>
 
-            <h1 style="text-align:center;">Admin Control Panel</h1>
+            <h1 style="text-align:center; margin-bottom: 0.5rem;">Admin Control Panel</h1>
             
-            <article>
-                <h3 style="text-align:center;">EPJ Management <small>(Right-click for quick actions)</small></h3>
-                <div id="statusGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;"></div>
-            </article>
-
-            <article>
-                <h3><ins>Live Check-Outs</ins></h3>
-                <div class="overflow-auto">
-                    <table id="activeCheckoutsTable">
-                        <thead><tr><th>Driver</th><th>Carrier</th><th>EPJ</th><th>Truck/Trailer</th><th>Route</th><th>Check-Out Time</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </article>
-
-            <div class="grid">
+            <!-- Tab Navigation -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="epj-status">EPJ Status</button>
+                <button class="tab-btn" data-tab="live-checkouts">Live Checkouts</button>
+                <button class="tab-btn" data-tab="users">Users</button>
+                <button class="tab-btn" data-tab="maintenance">Maintenance</button>
+                <button class="tab-btn" data-tab="fleet">Fleet Management</button>
+                <button class="tab-btn" data-tab="settings" data-tooltip="Notification & display settings">⚙️ Settings</button>
+            </nav>
+            
+            <!-- Tab: EPJ Status -->
+            <div id="tab-epj-status" class="tab-content active">
                 <article>
-                    <h3><ins>Add New User</ins></h3>
-                    <input type="text" id="newUsername" placeholder="New Username" autocomplete="off">
-                    <input type="password" id="newPassword" placeholder="New Password" autocomplete="off">
-                    <input type="text" id="newCarrier" placeholder="Carrier Name (Optional)">
-                    <select id="newRole"><option>Driver</option><option>Admin</option><option>Load Support</option></select>
-                    <button id="addUserBtn" onclick="addUser()"><span>Create User</span></button>
-                </article>
-                <article>
-                    <h3><ins>Maintenance Mode</ins></h3>
-                    <select id="maintenanceEpj"></select>
-                    <input type="text" id="maintenanceReason" placeholder="Reason for maintenance (optional)">
-                    <select id="maintenanceAction">
-                        <option value="Maintenance Start">Put IN Maintenance</option>
-                        <option value="Maintenance End">Return FROM Maintenance</option>
-                    </select>
-                    <button id="maintenanceBtn" onclick="setMaintenance()"><span>Update Status</span></button>
+                    <h3 style="text-align:center;">EPJ Management <small>(Right-click for quick actions)</small></h3>
+                    <div id="statusGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 10px;"></div>
                 </article>
             </div>
             
-            <article>
-                <h3><ins>Mass Create Users</ins></h3>
-                <blockquote>
-                    Paste user data below in CSV format, one user per line:<br>
-                    <small><b>Format:</b> <code>username,password,Role,CarrierName</code></small><br>
-                    <small><b>Example:</b> <code>jdoe,Password123,Driver,Carrier A</code></small>
-                </blockquote>
-                <textarea id="massUserCsv" placeholder="user1,pass1,Driver,Carrier A&#10;user2,pass2,Admin,Carrier B" style="height: 150px;"></textarea>
-                <button id="massCreateBtn" onclick="massCreateUsers()"><span>Create Multiple Users</span></button>
-            </article>
-
-            <article>
-                <button id="userMgmtBtn" style="width:100%;margin-top:2em;" onclick="openUserManagement()"><span>Open User Management</span></button>
-            </article>
-
-            <article>
-                <h3><ins>EPJ Fleet Management</ins></h3>
+            <!-- Tab: Live Checkouts -->
+            <div id="tab-live-checkouts" class="tab-content">
+                <article>
+                    <h3 style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><ins>Live Check-Outs</ins></span>
+                        <span style="display:flex; align-items:center; gap:0.5rem;">
+                            <small id="liveCheckoutsLastUpdate" style="font-weight:normal; color:var(--muted-color);"></small>
+                            <button id="adminCheckoutBtn" class="outline" style="margin:0; padding:0.25rem 0.75rem; font-size:0.85rem;" onclick="openAdminCheckoutModal()" data-tooltip="Manually check out a driver">
+                                <span>+ Admin Checkout</span>
+                            </button>
+                            <button id="refreshCheckoutsBtn" class="outline secondary" style="margin:0; padding:0.25rem 0.75rem; font-size:0.85rem;" onclick="refreshLiveCheckouts(true)" data-tooltip="Refresh checkout list now">
+                                <span>⟳ Refresh</span>
+                            </button>
+                        </span>
+                    </h3>
+                    <div class="overflow-auto">
+                        <table id="activeCheckoutsTable">
+                            <thead><tr><th>Driver</th><th>Carrier</th><th>EPJ</th><th>Type</th><th>Truck</th><th>Trailer</th><th>Route</th><th>Time</th><th>Worked</th><th>Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </article>
+            </div>
+            
+            <!-- Tab: Users -->
+            <div id="tab-users" class="tab-content">
                 <div class="grid">
-                    <div>
-                        <label>Add New EPJ</label>
-                        <input type="text" id="newEpjNumber" placeholder="EPJ Number (e.g., EPJ-001)" autocomplete="off">
-                        <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
-                            <input type="checkbox" id="newEpjStoreOnly" style="width:auto;">
-                            <span>Store Delivery Only</span>
-                        </label>
-                        <button id="addEpjBtn" onclick="addNewEpj()"><span>Add EPJ</span></button>
-                    </div>
-                    <div>
-                        <label>Remove EPJ</label>
-                        <select id="removeEpjSelect">
-                            <option value="" disabled selected>Select EPJ to remove...</option>
-                        </select>
-                        <p style="font-size:0.85rem; color:var(--pico-muted-color); margin-bottom:0.5rem;">Note: Cannot remove EPJs that are currently checked out.</p>
-                        <button id="removeEpjBtn" class="secondary" onclick="removeEpj()"><span>Remove EPJ</span></button>
-                    </div>
+                    <article>
+                        <h3><ins>Add New User</ins></h3>
+                        <input type="text" id="newUsername" placeholder="New Username" autocomplete="off">
+                        <input type="password" id="newPassword" placeholder="New Password" autocomplete="off">
+                        <input type="text" id="newCarrier" placeholder="Carrier Name (Optional)">
+                        <select id="newRole"><option>Driver</option><option>Admin</option><option>Load Support</option></select>
+                        <button id="addUserBtn" onclick="addUser()"><span>Create User</span></button>
+                    </article>
+                    <article>
+                        <h3><ins>Mass Create Users</ins></h3>
+                        <blockquote style="margin-bottom: 0.5rem;">
+                            <small><b>Format:</b> <code>username,password,Role,CarrierName</code></small>
+                        </blockquote>
+                        <textarea id="massUserCsv" placeholder="user1,pass1,Driver,Carrier A&#10;user2,pass2,Admin,Carrier B" style="height: 120px;"></textarea>
+                        <button id="massCreateBtn" onclick="massCreateUsers()"><span>Create Multiple Users</span></button>
+                    </article>
                 </div>
-            </article>
-
-            <article>
-                <h3><ins>Recent Maintenance Events</ins></h3>
-                <div class="overflow-auto">
-                    <table id="maintenanceTable">
-                        <thead><tr><th>Timestamp</th><th>EPJ</th><th>Event</th><th>Reason</th><th>Resolution</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </article>
+                <article>
+                    <button id="userMgmtBtn" style="width:100%;" onclick="openUserManagement()"><span>Open User Management</span></button>
+                </article>
+            </div>
+            
+            <!-- Tab: Maintenance -->
+            <div id="tab-maintenance" class="tab-content">
+                <article>
+                    <h3><ins>Maintenance Mode</ins></h3>
+                    <div class="grid">
+                        <div>
+                            <label>Select EPJ</label>
+                            <select id="maintenanceEpj"></select>
+                        </div>
+                        <div>
+                            <label>Reason (optional)</label>
+                            <input type="text" id="maintenanceReason" placeholder="Reason for maintenance">
+                        </div>
+                        <div>
+                            <label>Action</label>
+                            <select id="maintenanceAction">
+                                <option value="Maintenance Start">Put IN Maintenance</option>
+                                <option value="Maintenance End">Return FROM Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="maintenanceBtn" onclick="setMaintenance()"><span>Update Status</span></button>
+                </article>
+                <article>
+                    <h3><ins>Recent Maintenance Events</ins></h3>
+                    <div class="overflow-auto">
+                        <table id="maintenanceTable">
+                            <thead><tr><th>Timestamp</th><th>EPJ</th><th>Event</th><th>Reason</th><th>Resolution</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </article>
+            </div>
+            
+            <!-- Tab: Fleet Management -->
+            <div id="tab-fleet" class="tab-content">
+                <article>
+                    <h3><ins>EPJ Fleet Management</ins></h3>
+                    <div class="grid">
+                        <div>
+                            <label>Add New EPJ</label>
+                            <input type="text" id="newEpjNumber" placeholder="EPJ Number (e.g., EPJ-001)" autocomplete="off">
+                            <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                                <input type="checkbox" id="newEpjStoreOnly" style="width:auto;">
+                                <span>Store Delivery Only</span>
+                            </label>
+                            <button id="addEpjBtn" onclick="addNewEpj()"><span>Add EPJ</span></button>
+                        </div>
+                        <div>
+                            <label>Remove EPJ</label>
+                            <select id="removeEpjSelect">
+                                <option value="" disabled selected>Select EPJ to remove...</option>
+                            </select>
+                            <p style="font-size:0.85rem; color:var(--pico-muted-color); margin-bottom:0.5rem;">Note: Cannot remove EPJs that are currently checked out.</p>
+                            <button id="removeEpjBtn" class="secondary" onclick="removeEpj()"><span>Remove EPJ</span></button>
+                        </div>
+                    </div>
+                </article>
+            </div>
 
             <p id="feedback" style="text-align:center; min-height: 20px;"></p>
         </main>
@@ -251,6 +643,76 @@
         
         <!-- Recent Logins Badge -->
         <div id="recentLoginsBadge" class="notification-badge"></div>
+
+            <!-- Tab: Settings -->
+            <div id="tab-settings" class="tab-content">
+                <article>
+                    <h3 style="text-align:center;">⚙️ Dashboard Settings</h3>
+                    
+                    <div class="notification-prefs">
+                        <h4>🔔 Notification Preferences</h4>
+                        <div class="pref-row">
+                            <label for="prefSoundEnabled">Enable notification sounds</label>
+                            <input type="checkbox" id="prefSoundEnabled" checked role="switch">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefFreshLoginSound">New checkout sound</label>
+                            <select id="prefFreshLoginSound">
+                                <option value="chime">Chime (ascending)</option>
+                                <option value="ding">Ding</option>
+                                <option value="bell">Bell</option>
+                                <option value="pop">Pop</option>
+                                <option value="success">Success</option>
+                                <option value="ping">Ping</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefSwapSound">EPJ swap sound</label>
+                            <select id="prefSwapSound">
+                                <option value="double-beep">Double beep</option>
+                                <option value="alert">Alert tone</option>
+                                <option value="warning">Warning</option>
+                                <option value="swoosh">Swoosh</option>
+                                <option value="blip">Blip-blip</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefVolume">Sound volume</label>
+                            <input type="range" id="prefVolume" min="0" max="100" value="50" style="width:120px;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefVisualNotify">Show visual notifications</label>
+                            <input type="checkbox" id="prefVisualNotify" checked role="switch">
+                        </div>
+                        <div class="test-buttons">
+                            <button onclick="testNotificationSound('fresh')" class="secondary outline" data-tooltip="Test fresh login sound">🔊 Test Fresh</button>
+                            <button onclick="testNotificationSound('swap')" class="secondary outline" data-tooltip="Test swap sound">🔊 Test Swap</button>
+                        </div>
+                    </div>
+                    
+                    <div class="notification-prefs">
+                        <h4>📊 Display Preferences</h4>
+                        <div class="pref-row">
+                            <label for="prefAutoRefresh">Auto-refresh interval</label>
+                            <select id="prefAutoRefresh">
+                                <option value="30">30 seconds</option>
+                                <option value="60">1 minute</option>
+                                <option value="120" selected>2 minutes</option>
+                                <option value="300">5 minutes</option>
+                                <option value="0">Manual only</option>
+                            </select>
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefCompactMode">Compact table view</label>
+                            <input type="checkbox" id="prefCompactMode" role="switch">
+                        </div>
+                    </div>
+                    
+                    <p style="text-align:center; color:var(--muted-color); font-size:0.85rem; margin-top:1rem;">Settings are saved to your browser and will persist between sessions.</p>
+                </article>
+            </div>
 
         <!-- Context Menu for EPJ Cards -->
         <div id="epjContextMenu" class="context-menu">
@@ -262,9 +724,118 @@
                 Store Delivery Only <span class="toggle-indicator" id="storeToggleIndicator"></span>
             </div>
         </div>
+        
+        <!-- EPJ Swap Modal -->
+        <div id="epjSwapModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Change Driver's EPJ</h3>
+                    <button class="modal-close" onclick="closeEpjSwapModal()">&times;</button>
+                </div>
+                
+                <div class="current-epj-info">
+                    <strong>Current EPJ: <span id="swapCurrentEpj"></span></strong>
+                    <p style="margin:0.5rem 0 0 0;">Driver: <span id="swapDriverName"></span></p>
+                    <p style="margin:0.25rem 0 0 0;">Trip: <span id="swapTripId"></span></p>
+                </div>
+                
+                <label for="swapMaintenanceReason">Maintenance Issue for Old EPJ (optional)</label>
+                <textarea id="swapMaintenanceReason" placeholder="e.g., Battery not holding charge, forks damaged..."></textarea>
+                <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;">
+                    <input type="checkbox" id="swapPutInMaintenance" style="width:auto;" checked>
+                    <span>Put old EPJ in Maintenance</span>
+                </label>
+                
+                <div class="new-epj-section">
+                    <strong>Select New EPJ</strong>
+                    <select id="swapNewEpj" style="margin-top:0.5rem;">
+                        <option value="" disabled selected>Loading available EPJs...</option>
+                    </select>
+                </div>
+                
+                <div class="grid">
+                    <button class="secondary" onclick="closeEpjSwapModal()">Cancel</button>
+                    <button id="swapConfirmBtn" onclick="confirmEpjSwap()"><span>Confirm Swap</span></button>
+                </div>
+                
+                <p id="swapFeedback" style="text-align:center; min-height:20px; margin-top:1rem;"></p>
+            </div>
+        </div>
+
+        <!-- Admin Checkout Modal -->
+        <div id="adminCheckoutModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Admin Checkout for Driver</h3>
+                    <button class="modal-close" onclick="closeAdminCheckoutModal()">&times;</button>
+                </div>
+                
+                <label for="adminCheckoutDriver">Select Driver</label>
+                <select id="adminCheckoutDriver" onchange="onAdminDriverSelect()">
+                    <option value="" disabled selected>Loading drivers...</option>
+                </select>
+                
+                <label style="display:flex; align-items:center; gap:0.5rem; margin:1rem 0;">
+                    <input type="checkbox" id="adminCheckoutOverspill" style="width:auto;" onchange="toggleAdminCheckoutOverspill()">
+                    <span>Overspill (No EPJ needed)</span>
+                </label>
+                
+                <div id="adminCheckoutEpjSection">
+                    <label for="adminCheckoutEpj">Select EPJ</label>
+                    <select id="adminCheckoutEpj">
+                        <option value="" disabled selected>Loading available EPJs...</option>
+                    </select>
+                </div>
+                
+                <label for="adminCheckoutTruck">Truck Number</label>
+                <input type="text" id="adminCheckoutTruck" placeholder="Enter truck number">
+                
+                <label for="adminCheckoutTrailer">Trailer Number</label>
+                <input type="text" id="adminCheckoutTrailer" placeholder="Enter trailer number">
+                
+                <label for="adminCheckoutRoute">Route</label>
+                <input type="text" id="adminCheckoutRoute" placeholder="Enter route (e.g., DC1, Store Run)">
+                
+                <div class="grid">
+                    <button class="secondary" onclick="closeAdminCheckoutModal()">Cancel</button>
+                    <button id="adminCheckoutConfirmBtn" onclick="confirmAdminCheckout()"><span>Checkout EPJ</span></button>
+                </div>
+                
+                <p id="adminCheckoutFeedback" style="text-align:center; min-height:20px; margin-top:1rem;"></p>
+            </div>
+        </div>
 
         <script>
             (function() {
+                // Tab Navigation Handler
+                document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var tabId = this.dataset.tab;
+                        
+                        // Update button states
+                        document.querySelectorAll('.tab-btn').forEach(function(b) {
+                            b.classList.remove('active');
+                        });
+                        this.classList.add('active');
+                        
+                        // Update content visibility
+                        document.querySelectorAll('.tab-content').forEach(function(content) {
+                            content.classList.remove('active');
+                        });
+                        document.getElementById('tab-' + tabId).classList.add('active');
+                        
+                        // Store active tab in localStorage
+                        localStorage.setItem('adminActiveTab', tabId);
+                    });
+                });
+                
+                // Restore last active tab
+                var savedTab = localStorage.getItem('adminActiveTab');
+                if (savedTab) {
+                    var tabBtn = document.querySelector('.tab-btn[data-tab="' + savedTab + '"]');
+                    if (tabBtn) tabBtn.click();
+                }
+                
                 // Get token from multiple sources to ensure we have it
                 var _token = null;
                 
@@ -305,8 +876,92 @@
                 var _isFirstLoad = true;
                 var _currentContextEpj = null;
                 var _allEpjDetails = [];
-                var _lastSeenLoginTime = Date.now(); // Track last seen login to avoid duplicate notifications
+                var _seenCheckoutIds = {}; // Track seen checkouts by tripId to trigger sounds for new ones
+                var _isFirstCheckoutLoad = true; // Don't play sounds on initial page load
                 var _notificationSound = null;
+                var _isRefreshing = false; // Prevent multiple refresh attempts
+                var _consecutiveErrors = 0; // Track consecutive errors
+                
+                // Centralized session error handler - auto-refreshes on token/permission errors
+                function handleSessionError(err) {
+                    if (_isRefreshing) return true; // Already handling refresh
+                    
+                    var errorMsg = (err && err.message) ? err.message : String(err || '');
+                    
+                    // Only match specific session/permission errors - be conservative
+                    var isSessionError = (
+                        errorMsg.indexOf('Permission denied') !== -1 ||
+                        errorMsg.indexOf('Invalid session') !== -1 ||
+                        errorMsg.indexOf('session expired') !== -1 ||
+                        errorMsg.indexOf('No session token') !== -1
+                    );
+                    
+                    if (isSessionError) {
+                        _isRefreshing = true;
+                        
+                        // Stop all timers
+                        stopAllTimers();
+                        
+                        // Show notification
+                        var feedback = document.getElementById('feedback');
+                        if (feedback) {
+                            feedback.innerHTML = '<strong style="color:orange;">Session expired - Refreshing page in 3 seconds...</strong>';
+                        }
+                        
+                        // Auto-refresh after 3 seconds
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 3000);
+                        
+                        return true; // Error was handled
+                    }
+                    return false; // Not a session error
+                }
+                
+                // Stop all timers safely
+                function stopAllTimers() {
+                    try {
+                        if (window.dashboardRefreshTimer) {
+                            clearInterval(window.dashboardRefreshTimer);
+                            window.dashboardRefreshTimer = null;
+                        }
+                        if (window.loginCheckTimer) {
+                            clearInterval(window.loginCheckTimer);
+                            window.loginCheckTimer = null;
+                        }
+                        if (window.liveCheckoutsTimer) {
+                            clearInterval(window.liveCheckoutsTimer);
+                            window.liveCheckoutsTimer = null;
+                        }
+                    } catch(e) {
+                        console.error('Error stopping timers:', e);
+                    }
+                }
+                
+                // Safe wrapper for polling functions to prevent silent failures
+                function safeCall(fn, errorContext) {
+                    return function() {
+                        try {
+                            fn.apply(this, arguments);
+                        } catch(e) {
+                            console.error('Error in ' + errorContext + ':', e);
+                            _consecutiveErrors++;
+                            if (_consecutiveErrors > 5) {
+                                console.error('Too many consecutive errors, stopping timers');
+                                stopAllTimers();
+                                var feedback = document.getElementById('feedback');
+                                if (feedback) {
+                                    feedback.innerHTML = '<strong style="color:red;">Multiple errors detected. Please refresh the page.</strong>';
+                                }
+                            }
+                        }
+                    };
+                }
+                
+                // Reset error counter on successful operations
+                function resetErrorCounter() {
+                    _consecutiveErrors = 0;
+                }
                 
                 // Initialize notification sound (simple beep using Web Audio API)
                 function initNotificationSound() {
@@ -321,49 +976,345 @@
                 }
                 initNotificationSound();
                 
-                function playChime() {
+                // Resume AudioContext on any user interaction (required for sound to work)
+                function resumeAudioContext() {
+                    if (window._audioCtx && window._audioCtx.state === 'suspended') {
+                        window._audioCtx.resume().then(function() {
+                            console.log('AudioContext resumed via user interaction');
+                        }).catch(function(e) {
+                            console.log('Could not resume AudioContext:', e);
+                        });
+                    }
+                }
+                // Listen for first user interaction to enable audio
+                document.addEventListener('click', resumeAudioContext, { once: false });
+                document.addEventListener('keydown', resumeAudioContext, { once: false });
+                
+                // Notification Preferences Management
+                var _notifPrefs = {
+                    soundEnabled: true,
+                    freshLoginSound: 'chime',
+                    swapSound: 'double-beep',
+                    volume: 50,
+                    visualNotify: true,
+                    autoRefresh: 120,
+                    compactMode: false
+                };
+                
+                function loadNotificationPrefs() {
                     try {
-                        if (!window._audioCtx) return;
+                        var saved = localStorage.getItem('dsim_notif_prefs');
+                        if (saved) {
+                            var parsed = JSON.parse(saved);
+                            _notifPrefs = Object.assign(_notifPrefs, parsed);
+                        }
+                    } catch(e) { console.log('Error loading prefs:', e); }
+                    applyNotificationPrefs();
+                }
+                
+                function saveNotificationPrefs() {
+                    try {
+                        localStorage.setItem('dsim_notif_prefs', JSON.stringify(_notifPrefs));
+                    } catch(e) { console.log('Error saving prefs:', e); }
+                }
+                
+                function applyNotificationPrefs() {
+                    var soundEnabled = document.getElementById('prefSoundEnabled');
+                    var freshSound = document.getElementById('prefFreshLoginSound');
+                    var swapSound = document.getElementById('prefSwapSound');
+                    var volume = document.getElementById('prefVolume');
+                    var visualNotify = document.getElementById('prefVisualNotify');
+                    var autoRefresh = document.getElementById('prefAutoRefresh');
+                    var compactMode = document.getElementById('prefCompactMode');
+                    
+                    if (soundEnabled) soundEnabled.checked = _notifPrefs.soundEnabled;
+                    if (freshSound) freshSound.value = _notifPrefs.freshLoginSound;
+                    if (swapSound) swapSound.value = _notifPrefs.swapSound;
+                    if (volume) volume.value = _notifPrefs.volume;
+                    if (visualNotify) visualNotify.checked = _notifPrefs.visualNotify;
+                    if (autoRefresh) autoRefresh.value = String(_notifPrefs.autoRefresh);
+                    if (compactMode) compactMode.checked = _notifPrefs.compactMode;
+                    
+                    // Apply compact mode
+                    var tables = document.querySelectorAll('table');
+                    tables.forEach(function(t) {
+                        if (_notifPrefs.compactMode) {
+                            t.classList.add('compact-table');
+                        } else {
+                            t.classList.remove('compact-table');
+                        }
+                    });
+                }
+                
+                function setupPrefsListeners() {
+                    var prefIds = ['prefSoundEnabled', 'prefFreshLoginSound', 'prefSwapSound', 'prefVolume', 'prefVisualNotify', 'prefAutoRefresh', 'prefCompactMode'];
+                    prefIds.forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) {
+                            el.addEventListener('change', function() {
+                                updatePrefFromElement(id);
+                            });
+                        }
+                    });
+                }
+                
+                function updatePrefFromElement(id) {
+                    var el = document.getElementById(id);
+                    if (!el) return;
+                    
+                    switch(id) {
+                        case 'prefSoundEnabled': _notifPrefs.soundEnabled = el.checked; break;
+                        case 'prefFreshLoginSound': _notifPrefs.freshLoginSound = el.value; break;
+                        case 'prefSwapSound': _notifPrefs.swapSound = el.value; break;
+                        case 'prefVolume': _notifPrefs.volume = parseInt(el.value, 10); break;
+                        case 'prefVisualNotify': _notifPrefs.visualNotify = el.checked; break;
+                        case 'prefAutoRefresh':
+                            _notifPrefs.autoRefresh = parseInt(el.value, 10);
+                            restartAutoRefresh();
+                            break;
+                        case 'prefCompactMode':
+                            _notifPrefs.compactMode = el.checked;
+                            applyNotificationPrefs();
+                            break;
+                    }
+                    saveNotificationPrefs();
+                }
+                
+                function restartAutoRefresh() {
+                    if (window.dashboardRefreshTimer) {
+                        clearInterval(window.dashboardRefreshTimer);
+                        window.dashboardRefreshTimer = null;
+                    }
+                    if (_notifPrefs.autoRefresh > 0) {
+                        window.dashboardRefreshTimer = setInterval(safeCall(refreshDashboard, 'refreshDashboard'), _notifPrefs.autoRefresh * 1000);
+                    }
+                }
+                
+                // Expose test function globally for onclick handlers
+                window.testNotificationSound = function(type) {
+                    console.log('Test sound clicked:', type);
+                    // Force play for testing - bypass preferences
+                    try {
+                        // Ensure audio context exists
+                        if (!window._audioCtx) {
+                            var AudioContext = window.AudioContext || window.webkitAudioContext;
+                            if (AudioContext) {
+                                window._audioCtx = new AudioContext();
+                                console.log('Created new AudioContext');
+                            }
+                        }
+                        if (!window._audioCtx) {
+                            alert('Audio not supported in this browser');
+                            return;
+                        }
+                        
                         var ctx = window._audioCtx;
-                        if (ctx.state === 'suspended') ctx.resume();
+                        console.log('AudioContext state:', ctx.state);
                         
-                        // Create a pleasant two-tone chime
-                        var now = ctx.currentTime;
+                        // Resume if suspended (required for user interaction)
+                        if (ctx.state === 'suspended') {
+                            ctx.resume().then(function() {
+                                console.log('AudioContext resumed');
+                                window.playTestTone(ctx, type);
+                            });
+                        } else {
+                            window.playTestTone(ctx, type);
+                        }
+                    } catch(e) {
+                        console.error('Error in testNotificationSound:', e);
+                        alert('Could not play sound: ' + e.message);
+                    }
+                };
+                
+                // Helper function for playing tones (exposed for internal use)
+                window.playTestTone = function(ctx, type) {
+                    var now = ctx.currentTime;
+                    // Get volume from slider, default to 50% if not set
+                    var volumeEl = document.getElementById('prefVolume');
+                    var volumeVal = volumeEl ? parseInt(volumeEl.value, 10) : 50;
+                    var volume = (volumeVal / 100) * 0.4; // Scale to max 0.4
+                    if (volume < 0.05) volume = 0.15; // Minimum audible volume
+                    
+                    // Get the specific sound preference
+                    var soundType = type;
+                    if (type === 'fresh') {
+                        soundType = _notifPrefs.freshLoginSound || 'chime';
+                    } else if (type === 'swap') {
+                        soundType = _notifPrefs.swapSound || 'double-beep';
+                    }
+                    
+                    console.log('Playing sound:', soundType, 'volume:', volume);
+                    
+                    // Sound definitions
+                    switch(soundType) {
+                        case 'chime':
+                            // Ascending two-tone chime
+                            playTone(ctx, now, 659.25, 'sine', volume, 0.3);
+                            playTone(ctx, now + 0.15, 880, 'sine', volume, 0.35);
+                            break;
+                            
+                        case 'ding':
+                            // Single bright ding
+                            playTone(ctx, now, 1200, 'sine', volume, 0.4);
+                            break;
+                            
+                        case 'bell':
+                            // Bell-like tone with harmonics
+                            playTone(ctx, now, 440, 'sine', volume * 0.8, 0.5);
+                            playTone(ctx, now, 880, 'sine', volume * 0.4, 0.4);
+                            playTone(ctx, now, 1320, 'sine', volume * 0.2, 0.3);
+                            break;
+                            
+                        case 'pop':
+                            // Quick pop sound
+                            playTone(ctx, now, 800, 'sine', volume, 0.08);
+                            playTone(ctx, now + 0.05, 600, 'sine', volume * 0.6, 0.1);
+                            break;
+                            
+                        case 'success':
+                            // Three ascending tones (success fanfare)
+                            playTone(ctx, now, 523.25, 'sine', volume, 0.15);
+                            playTone(ctx, now + 0.12, 659.25, 'sine', volume, 0.15);
+                            playTone(ctx, now + 0.24, 783.99, 'sine', volume, 0.25);
+                            break;
+                            
+                        case 'ping':
+                            // High-pitched ping
+                            playTone(ctx, now, 1500, 'sine', volume * 0.7, 0.2);
+                            break;
+                            
+                        case 'double-beep':
+                            // Double beep for swaps
+                            playTone(ctx, now, 523.25, 'sine', volume, 0.15);
+                            playTone(ctx, now + 0.2, 523.25, 'sine', volume, 0.15);
+                            break;
+                            
+                        case 'alert':
+                            // Alert tone - descending
+                            playTone(ctx, now, 880, 'square', volume * 0.5, 0.2);
+                            playTone(ctx, now + 0.15, 660, 'square', volume * 0.5, 0.25);
+                            break;
+                            
+                        case 'warning':
+                            // Warning - three quick beeps
+                            playTone(ctx, now, 800, 'square', volume * 0.4, 0.1);
+                            playTone(ctx, now + 0.15, 800, 'square', volume * 0.4, 0.1);
+                            playTone(ctx, now + 0.3, 800, 'square', volume * 0.4, 0.15);
+                            break;
+                            
+                        case 'swoosh':
+                            // Frequency sweep swoosh
+                            var osc = ctx.createOscillator();
+                            var gain = ctx.createGain();
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(300, now);
+                            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.2);
+                            gain.gain.setValueAtTime(volume, now);
+                            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                            osc.start(now);
+                            osc.stop(now + 0.25);
+                            break;
+                            
+                        case 'blip':
+                            // Two quick blips at different pitches
+                            playTone(ctx, now, 600, 'sine', volume, 0.08);
+                            playTone(ctx, now + 0.12, 900, 'sine', volume, 0.08);
+                            break;
+                            
+                        default:
+                            // Fallback to simple beep
+                            playTone(ctx, now, 800, 'sine', volume, 0.2);
+                    }
+                };
+                
+                // Helper to play a single tone
+                function playTone(ctx, startTime, freq, waveType, vol, duration) {
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = waveType;
+                    gain.gain.setValueAtTime(vol, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                    osc.start(startTime);
+                    osc.stop(startTime + duration);
+                }
+                
+                // Initialize preferences on load
+                setTimeout(function() {
+                    loadNotificationPrefs();
+                    setupPrefsListeners();
+                }, 100);
+                
+                function playChime(type) {
+                    console.log('playChime called with type:', type, 'soundEnabled:', _notifPrefs.soundEnabled);
+                    
+                    // Check if sound is enabled
+                    if (!_notifPrefs.soundEnabled) {
+                        console.log('Sound disabled in preferences');
+                        return;
+                    }
+                    
+                    // Check if this specific sound type is disabled
+                    if (type === 'swap' && _notifPrefs.swapSound === 'none') {
+                        console.log('Swap sound disabled');
+                        return;
+                    }
+                    if (type === 'fresh' && _notifPrefs.freshLoginSound === 'none') {
+                        console.log('Fresh login sound disabled');
+                        return;
+                    }
+                    
+                    // Use the same logic as test sound
+                    try {
+                        if (!window._audioCtx) {
+                            var AudioContext = window.AudioContext || window.webkitAudioContext;
+                            if (AudioContext) window._audioCtx = new AudioContext();
+                        }
+                        if (!window._audioCtx) {
+                            console.log('No AudioContext available');
+                            return;
+                        }
                         
-                        // First tone (higher)
-                        var osc1 = ctx.createOscillator();
-                        var gain1 = ctx.createGain();
-                        osc1.connect(gain1);
-                        gain1.connect(ctx.destination);
-                        osc1.frequency.value = 880; // A5
-                        osc1.type = 'sine';
-                        gain1.gain.setValueAtTime(0.3, now);
-                        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-                        osc1.start(now);
-                        osc1.stop(now + 0.3);
+                        var ctx = window._audioCtx;
+                        console.log('AudioContext state:', ctx.state);
                         
-                        // Second tone (lower, slight delay)
-                        var osc2 = ctx.createOscillator();
-                        var gain2 = ctx.createGain();
-                        osc2.connect(gain2);
-                        gain2.connect(ctx.destination);
-                        osc2.frequency.value = 659.25; // E5
-                        osc2.type = 'sine';
-                        gain2.gain.setValueAtTime(0.3, now + 0.15);
-                        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-                        osc2.start(now + 0.15);
-                        osc2.stop(now + 0.5);
+                        if (ctx.state === 'suspended') {
+                            ctx.resume().then(function() {
+                                console.log('AudioContext resumed, playing tone');
+                                window.playTestTone(ctx, type);
+                            }).catch(function(e) {
+                                console.log('Could not resume AudioContext:', e);
+                            });
+                        } else {
+                            console.log('Playing tone directly');
+                            window.playTestTone(ctx, type);
+                        }
                     } catch(e) {
                         console.log('Error playing chime:', e);
                     }
                 }
                 
-                function showNotification(username) {
+                function showNotification(username, isSwap, swapInfo) {
+                    // Play sound regardless of visual preference
+                    playChime(isSwap ? 'swap' : 'fresh');
+                    
+                    // Only show visual notification if enabled
+                    if (!_notifPrefs.visualNotify) return;
+                    
                     var toast = document.getElementById('loginNotification');
                     if (toast) {
-                        toast.innerHTML = 'Driver "' + username + '" has signed in!';
+                        if (isSwap) {
+                            toast.innerHTML = 'EPJ Swap: "' + username + '" swapped to ' + (swapInfo || 'new EPJ') + '!';
+                            toast.style.background = '#e65100'; // Orange for swaps
+                        } else {
+                            toast.innerHTML = 'Driver "' + username + '" has signed in!';
+                            toast.style.background = ''; // Default primary color
+                        }
                         toast.classList.add('show');
-                        playChime();
                         
                         // Auto-hide after 5 seconds
                         setTimeout(function() {
@@ -377,26 +1328,23 @@
                     
                     google.script.run
                         .withSuccessHandler(function(logins) {
+                            // Update badge with recent login count (sounds are handled by checkout detection)
+                            var badge = document.getElementById('recentLoginsBadge');
                             if (logins && logins.length > 0) {
-                                // Check for logins newer than our last seen time
-                                logins.forEach(function(login) {
-                                    if (login.timestampMs > _lastSeenLoginTime) {
-                                        showNotification(login.username);
-                                        _lastSeenLoginTime = login.timestampMs;
+                                if (badge) {
+                                    var freshCount = logins.filter(function(l) { return !l.isSwap && l.eventType !== 'swap'; }).length;
+                                    var swapCount = logins.filter(function(l) { return l.isSwap || l.eventType === 'swap'; }).length;
+                                    var badgeText = '';
+                                    if (freshCount > 0) badgeText += freshCount + ' login' + (freshCount > 1 ? 's' : '');
+                                    if (swapCount > 0) {
+                                        if (badgeText) badgeText += ', ';
+                                        badgeText += swapCount + ' swap' + (swapCount > 1 ? 's' : '');
                                     }
-                                });
-                                
-                                // Update badge with recent count
-                                var badge = document.getElementById('recentLoginsBadge');
-                                if (badge && logins.length > 0) {
-                                    badge.innerHTML = logins.length + ' recent driver login' + (logins.length > 1 ? 's' : '');
+                                    badge.innerHTML = badgeText;
                                     badge.classList.add('show');
-                                } else if (badge) {
-                                    badge.classList.remove('show');
                                 }
-                            } else {
-                                var badge = document.getElementById('recentLoginsBadge');
-                                if (badge) badge.classList.remove('show');
+                            } else if (badge) {
+                                badge.classList.remove('show');
                             }
                         })
                         .withFailureHandler(function(err) {
@@ -405,16 +1353,134 @@
                         .getRecentDriverLogins({token: _token, minutesBack: 2});
                 }
                 
+                // Clear any previously existing timers before setting up new ones
+                stopAllTimers();
+                
                 // Check for new logins every 15 seconds
                 if (window.loginCheckTimer) clearInterval(window.loginCheckTimer);
-                window.loginCheckTimer = setInterval(checkForNewDriverLogins, 15000);
+                window.loginCheckTimer = setInterval(safeCall(checkForNewDriverLogins, 'loginCheck'), 15000);
                 // Initial check after 3 seconds (give page time to load)
-                setTimeout(checkForNewDriverLogins, 3000);
+                setTimeout(safeCall(checkForNewDriverLogins, 'loginCheck'), 3000);
                 
-                // Clear any previously existing timer before this script runs again.
-                if (window.dashboardRefreshTimer) {
-                    clearInterval(window.dashboardRefreshTimer);
+                // Track if a refresh is in progress to prevent overlapping calls
+                var _liveCheckoutsInProgress = false;
+                var _dashboardRefreshInProgress = false;
+                
+                // Function to refresh only live checkouts (lightweight, fast)
+                window.refreshLiveCheckouts = function(forceRefresh) {
+                    if (!_token || _isRefreshing) return;
+                    if (_liveCheckoutsInProgress && !forceRefresh) return; // Skip if already in progress (unless forced)
+                    
+                    _liveCheckoutsInProgress = true;
+                    
+                    var btn = document.getElementById('refreshCheckoutsBtn');
+                    if (forceRefresh && btn) {
+                        btn.classList.add('btn-loading');
+                        btn.disabled = true;
+                    }
+                    
+                    google.script.run
+                        .withSuccessHandler(function(checkouts) {
+                            _liveCheckoutsInProgress = false;
+                            resetErrorCounter();
+                            try {
+                                updateLiveCheckoutsTable(checkouts);
+                                updateLastRefreshTime();
+                            } catch(e) {
+                                console.error('Error updating checkouts table:', e);
+                            }
+                            if (btn) {
+                                btn.classList.remove('btn-loading');
+                                btn.disabled = false;
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            _liveCheckoutsInProgress = false;
+                            if (handleSessionError(err)) return;
+                            console.log('Error refreshing checkouts:', err && err.message);
+                            if (btn) {
+                                btn.classList.remove('btn-loading');
+                                btn.disabled = false;
+                            }
+                        })
+                        .getActiveCheckoutsForAdmin({token: _token, forceRefresh: forceRefresh || false});
+                };
+                
+                function updateLiveCheckoutsTable(checkouts) {
+                    var activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
+                    if (!activeTableBody) return;
+                    
+                    // Check for new checkouts and play notification sounds
+                    if (checkouts && checkouts.length > 0) {
+                        checkouts.forEach(function(c) {
+                            var tripId = c.tripId;
+                            if (tripId && !_seenCheckoutIds[tripId]) {
+                                _seenCheckoutIds[tripId] = true;
+                                // Only play sound if not the initial page load
+                                if (!_isFirstCheckoutLoad) {
+                                    var tripIdStr = String(tripId);
+                                    var isSwap = c.isSwap || c.swappedFrom || tripIdStr.indexOf('SWAP-') === 0;
+                                    console.log('New checkout detected:', c.driver, 'tripId:', tripId, 'isSwap:', isSwap);
+                                    showNotification(c.driver, isSwap, c.epj);
+                                }
+                            }
+                        });
+                    }
+                    _isFirstCheckoutLoad = false; // After first load, enable sounds
+                    
+                    activeTableBody.innerHTML = '';
+                    if (checkouts && checkouts.length > 0) {
+                        checkouts.forEach(function(trip) {
+                            var isOverspill = trip.epj === 'N/A - Overspill';
+                            var epjClass = isOverspill ? 'epj-badge overspill' : 'epj-badge';
+                            var epjDisplay = isOverspill ? 'OS' : trip.epj;
+                            var timeOnly = trip.timestamp.split(',')[1] || trip.timestamp; // Get just time part
+                            
+                            // Determine checkout type (Swap vs Fresh)
+                            // Also check if tripId starts with SWAP- as a fallback
+                            var tripIdStr = String(trip.tripId || '');
+                            var isSwap = trip.isSwap || trip.swappedFrom || tripIdStr.indexOf('SWAP-') === 0;
+                            var typeClass = isSwap ? 'checkout-type swap' : 'checkout-type fresh';
+                            var typeLabel = isSwap ? 'Swap' : 'Fresh';
+                            var typeTitle = trip.swappedFrom ? 'Swapped from ' + trip.swappedFrom : (isSwap ? 'EPJ was swapped' : 'Fresh checkout');
+                            
+                            // Worked status
+                            var isWorked = trip.worked === true;
+                            var rowClass = isWorked ? ' class="is-worked"' : '';
+                            var checkedAttr = isWorked ? ' checked' : '';
+                            
+                            activeTableBody.innerHTML += '<tr' + rowClass + ' data-trip-id="' + trip.tripId + '">' +
+                                '<td><strong>' + trip.driver + '</strong></td>' +
+                                '<td>' + (trip.carrier || '-') + '</td>' +
+                                '<td><span class="' + epjClass + '">' + epjDisplay + '</span></td>' +
+                                '<td><span class="' + typeClass + '" title="' + typeTitle + '">' + typeLabel + '</span></td>' +
+                                '<td class="truck-trailer">' + (trip.truck || '-') + '</td>' +
+                                '<td class="truck-trailer">' + (trip.trailer || '-') + '</td>' +
+                                '<td>' + (trip.route || '-') + '</td>' +
+                                '<td>' + timeOnly.trim() + '</td>' +
+                                '<td class="worked-cell"><input type="checkbox" class="worked-checkbox" data-trip-id="' + trip.tripId + '"' + checkedAttr + ' onchange="toggleWorkedStatus(this, \'' + trip.tripId + '\')" title="Mark as worked"></td>' +
+                                '<td>' +
+                                    '<button class="outline" onclick="openEpjSwapModal(\'' + trip.tripId + '\', \'' + trip.epj + '\', \'' + trip.driver + '\', \'' + trip.driverUsername + '\')">Swap</button>' +
+                                    '<button class="secondary outline" onclick="forceCheckIn(\'' + trip.tripId + '\', \'' + trip.epj + '\')">Check-In</button>' +
+                                '</td></tr>';
+                        });
+                    } else {
+                        activeTableBody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📫</div><h4>No Active Checkouts</h4><p>All drivers are currently checked in. New checkouts will appear here automatically.</p></div></td></tr>';
+                    }
                 }
+                
+                function updateLastRefreshTime() {
+                    var el = document.getElementById('liveCheckoutsLastUpdate');
+                    if (el) {
+                        var now = new Date();
+                        el.textContent = 'Updated ' + now.toLocaleTimeString();
+                    }
+                }
+                
+                // Poll live checkouts every 30 seconds (reduced from 10 to prevent excessive calls)
+                window.liveCheckoutsTimer = setInterval(safeCall(function() {
+                    refreshLiveCheckouts(false);
+                }, 'liveCheckouts'), 30000);
 
                 // Close context menu when clicking anywhere
                 document.addEventListener('click', function(e) {
@@ -432,8 +1498,7 @@
                 });
 
                 window.logout = function() {
-                    if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
-                    if (window.loginCheckTimer) clearInterval(window.loginCheckTimer);
+                    stopAllTimers();
                     google.script.run.withSuccessHandler(function() {
                         var mainEl = document.querySelector('main');
                         if (mainEl) mainEl.innerHTML = '<h1>You have been logged out.</h1>';
@@ -445,19 +1510,28 @@
                     if (_isFirstLoad && feedback) { feedback.innerText = 'Loading data...'; }
                     
                     if (!_token) {
-                        if (feedback) feedback.innerText = 'Error: No session token. Please log in again.';
+                        handleSessionError({message: 'No session token'});
                         return;
                     }
                     
+                    if (_dashboardRefreshInProgress) return; // Skip if already refreshing
+                    _dashboardRefreshInProgress = true;
+                    
                     google.script.run
-                        .withSuccessHandler(populateDashboard)
-                        .withFailureHandler(function(err) {
-                            var feedback = document.getElementById('feedback');
-                            if (feedback) feedback.innerText = 'Error loading data: ' + (err.message || 'Unknown error');
-                            if (err.message && err.message.indexOf("Permission denied") !== -1) { 
-                                if (window.dashboardRefreshTimer) clearInterval(window.dashboardRefreshTimer);
-                                setTimeout(function() { if (typeof logout === 'function') logout(); }, 2000); 
+                        .withSuccessHandler(function(data) {
+                            _dashboardRefreshInProgress = false;
+                            resetErrorCounter();
+                            try {
+                                populateDashboard(data);
+                            } catch(e) {
+                                console.error('Error in populateDashboard:', e);
                             }
+                        })
+                        .withFailureHandler(function(err) {
+                            _dashboardRefreshInProgress = false;
+                            if (handleSessionError(err)) return;
+                            var feedback = document.getElementById('feedback');
+                            if (feedback) feedback.innerText = 'Error loading data: ' + (err && err.message ? err.message : 'Unknown error');
                         })
                         .getDashboardData({token: _token});
                     
@@ -467,39 +1541,73 @@
                             _allEpjDetails = details || [];
                         })
                         .withFailureHandler(function(err) {
-                            console.log('Error loading EPJ details:', err.message);
+                            console.log('Error loading EPJ details:', err && err.message);
                         })
                         .getAllEpjsWithDetails({token: _token});
                 }
                 
                 // Load immediately when page loads
                 loadDashboardData();
-                // Assign the timer to a property on the global 'window' object to prevent re-declaration errors.
-                window.dashboardRefreshTimer = setInterval(loadDashboardData, 60000);
+                // Full dashboard refresh every 2 minutes (reduced frequency)
+                window.dashboardRefreshTimer = setInterval(safeCall(loadDashboardData, 'dashboardRefresh'), 120000);
 
                 function populateDashboard(data) {
                     var feedback = document.getElementById('feedback');
                     if (!data) { 
-                        if (feedback) feedback.innerText = 'Error: No data received from server. Token may be invalid.'; 
+                        // Don't treat as session error - just log and skip
+                        console.log('No data received from server');
+                        if (feedback) feedback.innerText = 'No data received. Will retry on next refresh.';
                         return; 
                     }
+                    
+                    // Verify essential DOM elements exist before proceeding
                     var grid = document.getElementById('statusGrid');
                     var maintenanceSelect = document.getElementById('maintenanceEpj');
-                    if (grid) grid.innerHTML = '';
+                    if (!grid) {
+                        console.error('statusGrid element not found - page may be corrupted');
+                        return;
+                    }
+                    
+                    // Build a map of EPJ -> driver from active checkouts
+                    var epjDriverMap = {};
+                    if (data.activeCheckouts && data.activeCheckouts.length > 0) {
+                        data.activeCheckouts.forEach(function(checkout) {
+                            if (checkout.epj && checkout.epj !== 'N/A - Overspill') {
+                                epjDriverMap[checkout.epj] = {
+                                    driver: checkout.driver,
+                                    carrier: checkout.carrier || '',
+                                    truck: checkout.truck || '',
+                                    route: checkout.route || ''
+                                };
+                            }
+                        });
+                    }
+                    
+                    grid.innerHTML = '';
                     if (maintenanceSelect) maintenanceSelect.innerHTML = '<option disabled selected>Select EPJ...</option>';
                     
                     if (data.epjStatuses && data.epjStatuses.length > 0) {
                         data.epjStatuses.forEach(function(item) {
                             var color = item.status === 'Available' ? 'green' : (item.status === 'Checked Out' ? 'red' : 'orange');
                             var storeOnlyClass = item.storeOnly ? ' store-only' : '';
+                            var statusClass = item.status === 'Checked Out' ? ' checked-out' : (item.status === 'Maintenance' ? ' maintenance' : '');
                             var cardDiv = document.createElement('div');
-                            cardDiv.className = 'epj-card' + storeOnlyClass;
+                            cardDiv.className = 'epj-card' + storeOnlyClass + statusClass;
                             cardDiv.style.borderColor = color;
                             cardDiv.style.color = color;
-                            cardDiv.innerHTML = '<b>' + item.epj + '</b><br><small>' + item.status + '</small>';
+                            
+                            // Build card content with driver info if checked out
+                            var cardContent = '<b>' + item.epj + '</b><br><small>' + item.status + '</small>';
+                            if (item.status === 'Checked Out' && epjDriverMap[item.epj]) {
+                                var driverInfo = epjDriverMap[item.epj];
+                                cardContent += '<div class="driver-info">' + driverInfo.driver + '</div>';
+                            }
+                            
+                            cardDiv.innerHTML = cardContent;
                             cardDiv.dataset.epj = item.epj;
                             cardDiv.dataset.status = item.status;
                             cardDiv.dataset.storeOnly = item.storeOnly || false;
+                            cardDiv.tabIndex = 0; // Make focusable via keyboard
                             
                             // Add right-click event
                             cardDiv.addEventListener('contextmenu', function(e) {
@@ -507,23 +1615,32 @@
                                 showContextMenu(e, item.epj, item.storeOnly);
                             });
                             
-                            if (grid) grid.appendChild(cardDiv);
+                            // Add keyboard navigation - Enter or Space opens context menu
+                            cardDiv.addEventListener('keydown', function(e) {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    var rect = cardDiv.getBoundingClientRect();
+                                    var fakeEvent = { 
+                                        preventDefault: function(){}, 
+                                        target: cardDiv,
+                                        clientX: rect.left + rect.width / 2,
+                                        clientY: rect.bottom
+                                    };
+                                    showContextMenu(fakeEvent, item.epj, item.storeOnly);
+                                }
+                            });
+                            
+                            grid.appendChild(cardDiv);
                             if (maintenanceSelect) maintenanceSelect.innerHTML += '<option>' + item.epj + '</option>';
                         });
                     } else {
-                        if (grid) grid.innerHTML = '<p>No EPJs found in the system.</p>';
+                        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛠️</div><h4>No EPJs Configured</h4><p>No EPJs have been added to the system yet. Check the EPJ Status sheet in your spreadsheet.</p></div>';
                     }
                     
                     var activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
                     if (activeTableBody) {
-                        activeTableBody.innerHTML = '';
-                        if (data.activeCheckouts && data.activeCheckouts.length > 0) {
-                            data.activeCheckouts.forEach(function(trip) {
-                                activeTableBody.innerHTML += '<tr><td>' + trip.driver + '</td><td>' + trip.carrier + '</td><td>' + trip.epj + '</td><td>' + trip.truck + ' / ' + trip.trailer + '</td><td>' + trip.route + '</td><td>' + trip.timestamp + '</td><td><button class="secondary outline" onclick="forceCheckIn(\'' + trip.tripId + '\', \'' + trip.epj + '\')">Force Check-In</button></td></tr>';
-                            });
-                        } else {
-                            activeTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No active checkouts</td></tr>';
-                        }
+                        updateLiveCheckoutsTable(data.activeCheckouts);
+                        updateLastRefreshTime();
                     }
                     
                     var maintTableBody = document.querySelector('#maintenanceTable tbody');
@@ -551,40 +1668,25 @@
                     // Update toggle indicator (ASCII only to avoid template issues)
                     if (indicator) indicator.innerText = storeOnly ? 'Y' : '';
                     
-                    // Position menu - ensure it stays within viewport
+                    // Position menu directly below the clicked EPJ card (fixed to viewport)
                     if (menu) {
-                        // First show menu to get its dimensions
-                        menu.style.visibility = 'hidden';
-                        menu.classList.add('active');
+                        var card = event.currentTarget;
+                        var cardRect = card.getBoundingClientRect();
                         
-                        var menuWidth = menu.offsetWidth;
-                        var menuHeight = menu.offsetHeight;
-                        var viewportWidth = window.innerWidth;
-                        var viewportHeight = window.innerHeight;
-                        var scrollY = window.scrollY || window.pageYOffset;
-                        var scrollX = window.scrollX || window.pageXOffset;
+                        // getBoundingClientRect gives viewport-relative coordinates
+                        // Since menu is position:fixed, use these directly
+                        var left = cardRect.left;
+                        var top = cardRect.bottom + 5; // 5px gap below card
                         
-                        // Calculate position
-                        var left = event.pageX;
-                        var top = event.pageY;
-                        
-                        // Adjust if menu would go off right edge
-                        if (left + menuWidth > scrollX + viewportWidth) {
-                            left = scrollX + viewportWidth - menuWidth - 10;
+                        // Ensure menu doesn't go off screen to the right
+                        var menuWidth = 200; // min-width from CSS
+                        if (left + menuWidth > window.innerWidth) {
+                            left = window.innerWidth - menuWidth - 10;
                         }
-                        
-                        // Adjust if menu would go off bottom edge
-                        if (top + menuHeight > scrollY + viewportHeight) {
-                            top = scrollY + viewportHeight - menuHeight - 10;
-                        }
-                        
-                        // Ensure minimum positions
-                        if (left < scrollX) left = scrollX + 10;
-                        if (top < scrollY) top = scrollY + 10;
                         
                         menu.style.left = left + 'px';
                         menu.style.top = top + 'px';
-                        menu.style.visibility = 'visible';
+                        menu.classList.add('active');
                     }
                 }
 
@@ -608,6 +1710,7 @@
                             setTimeout(loadDashboardData, 500);
                         })
                         .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
                             var feedback = document.getElementById('feedback');
                             if (feedback) feedback.innerText = 'Error: ' + (err.message || 'Unknown error');
                         })
@@ -636,6 +1739,7 @@
                             setTimeout(loadDashboardData, 500);
                         })
                         .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
                             var feedback = document.getElementById('feedback');
                             if (feedback) feedback.innerText = 'Error: ' + (err.message || 'Unknown error');
                         })
@@ -654,6 +1758,7 @@
                             document.open(); document.write(html); document.close();
                         })
                         .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
                             setButtonLoading(btn, false);
                             alert('Error: ' + (err.message || 'Unknown error'));
                         })
@@ -689,6 +1794,7 @@
                 
                 function handleFailureWithBtn(btnId) {
                     return function(err) {
+                        if (handleSessionError(err)) return; // Auto-refresh on session error
                         var btn = document.getElementById(btnId);
                         setButtonLoading(btn, false);
                         var feedback = document.getElementById('feedback');
@@ -729,6 +1835,40 @@
                     if (confirm('Are you sure you want to force check-in EPJ ' + epj + '?')) {
                         google.script.run.withSuccessHandler(handleSuccess).adminForceCheckIn({token: _token, tripId: tripId, epj: epj});
                     }
+                };
+                
+                // Toggle worked status for a checkout
+                window.toggleWorkedStatus = function(checkbox, tripId) {
+                    var isWorked = checkbox.checked;
+                    var row = checkbox.closest('tr');
+                    
+                    // Optimistically update the UI
+                    if (isWorked) {
+                        row.classList.add('is-worked');
+                    } else {
+                        row.classList.remove('is-worked');
+                    }
+                    
+                    google.script.run
+                        .withSuccessHandler(function(result) {
+                            console.log('Worked status updated:', result);
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            // Revert the checkbox on error
+                            checkbox.checked = !isWorked;
+                            if (isWorked) {
+                                row.classList.remove('is-worked');
+                            } else {
+                                row.classList.add('is-worked');
+                            }
+                            alert('Error updating worked status: ' + (err.message || 'Unknown error'));
+                        })
+                        .adminUpdateWorkedStatus({
+                            token: _token,
+                            tripId: tripId,
+                            worked: isWorked
+                        });
                 };
 
                 window.addUser = function() {
@@ -809,6 +1949,7 @@
                             }
                         })
                         .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
                             console.error('Failed to load EPJ list:', err);
                         })
                         .adminGetAllEpjs({token: _token});
@@ -839,6 +1980,7 @@
                             loadEpjManagementList();
                         })
                         .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
                             setButtonLoading(btn, false);
                             alert('Error: ' + (err.message || 'Failed to add EPJ'));
                         })
@@ -870,6 +2012,7 @@
                             loadEpjManagementList();
                         })
                         .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
                             setButtonLoading(btn, false);
                             alert('Error: ' + (err.message || 'Failed to remove EPJ'));
                         })
@@ -878,6 +2021,260 @@
                 
                 // Load EPJ list on page load
                 loadEpjManagementList();
+                
+                // EPJ Swap Modal Functions
+                var _swapTripId = null;
+                var _swapCurrentEpj = null;
+                var _swapDriverName = null;
+                var _swapDriverUsername = null;
+                
+                window.openEpjSwapModal = function(tripId, currentEpj, driverName, driverUsername) {
+                    _swapTripId = tripId;
+                    _swapCurrentEpj = currentEpj;
+                    _swapDriverName = driverName;
+                    _swapDriverUsername = driverUsername;
+                    
+                    // Update modal info
+                    document.getElementById('swapCurrentEpj').textContent = currentEpj;
+                    document.getElementById('swapDriverName').textContent = driverName;
+                    document.getElementById('swapTripId').textContent = tripId;
+                    document.getElementById('swapMaintenanceReason').value = '';
+                    document.getElementById('swapPutInMaintenance').checked = true;
+                    document.getElementById('swapFeedback').textContent = '';
+                    
+                    // Load available EPJs
+                    var select = document.getElementById('swapNewEpj');
+                    select.innerHTML = '<option value="" disabled selected>Loading...</option>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(epjs) {
+                            select.innerHTML = '<option value="" disabled selected>Select new EPJ...</option>';
+                            if (epjs && epjs.length > 0) {
+                                epjs.forEach(function(item) {
+                                    if (item.status === 'Available' && item.epj !== currentEpj) {
+                                        var opt = document.createElement('option');
+                                        opt.value = item.epj;
+                                        opt.textContent = item.epj + (item.storeOnly ? ' [Store Only]' : '');
+                                        select.appendChild(opt);
+                                    }
+                                });
+                                if (select.options.length === 1) {
+                                    select.innerHTML = '<option value="" disabled selected>No available EPJs</option>';
+                                }
+                            } else {
+                                select.innerHTML = '<option value="" disabled selected>No available EPJs</option>';
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            select.innerHTML = '<option value="" disabled selected>Error loading EPJs</option>';
+                        })
+                        .adminGetAllEpjs({token: _token});
+                    
+                    // Show modal
+                    document.getElementById('epjSwapModal').classList.add('active');
+                };
+                
+                window.closeEpjSwapModal = function() {
+                    document.getElementById('epjSwapModal').classList.remove('active');
+                    _swapTripId = null;
+                    _swapCurrentEpj = null;
+                    _swapDriverName = null;
+                    _swapDriverUsername = null;
+                };
+                
+                window.confirmEpjSwap = function() {
+                    var newEpj = document.getElementById('swapNewEpj').value;
+                    var maintenanceReason = document.getElementById('swapMaintenanceReason').value;
+                    var putInMaintenance = document.getElementById('swapPutInMaintenance').checked;
+                    var feedback = document.getElementById('swapFeedback');
+                    var btn = document.getElementById('swapConfirmBtn');
+                    
+                    if (!newEpj) {
+                        feedback.textContent = 'Please select a new EPJ.';
+                        feedback.style.color = 'red';
+                        return;
+                    }
+                    
+                    setButtonLoading(btn, true);
+                    feedback.textContent = 'Processing swap...';
+                    feedback.style.color = '';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            setButtonLoading(btn, false);
+                            feedback.textContent = message;
+                            feedback.style.color = 'green';
+                            
+                            // Close modal and refresh after success
+                            setTimeout(function() {
+                                closeEpjSwapModal();
+                                loadDashboardData();
+                            }, 1500);
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            setButtonLoading(btn, false);
+                            feedback.textContent = 'Error: ' + (err.message || 'Unknown error');
+                            feedback.style.color = 'red';
+                        })
+                        .adminSwapEpj({
+                            token: _token,
+                            tripId: _swapTripId,
+                            oldEpj: _swapCurrentEpj,
+                            newEpj: newEpj,
+                            driverUsername: _swapDriverUsername,
+                            driverName: _swapDriverName,
+                            putInMaintenance: putInMaintenance,
+                            maintenanceReason: maintenanceReason
+                        });
+                };
+                
+                // Admin Checkout Modal Functions
+                var _adminCheckoutDrivers = [];
+                
+                window.openAdminCheckoutModal = function() {
+                    document.getElementById('adminCheckoutFeedback').textContent = '';
+                    document.getElementById('adminCheckoutOverspill').checked = false;
+                    document.getElementById('adminCheckoutEpjSection').style.display = 'block';
+                    document.getElementById('adminCheckoutTruck').value = '';
+                    document.getElementById('adminCheckoutTrailer').value = '';
+                    document.getElementById('adminCheckoutRoute').value = '';
+                    
+                    // Load drivers
+                    var driverSelect = document.getElementById('adminCheckoutDriver');
+                    driverSelect.innerHTML = '<option value="" disabled selected>Loading drivers...</option>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(users) {
+                            driverSelect.innerHTML = '<option value="" disabled selected>Select a driver...</option>';
+                            _adminCheckoutDrivers = users || [];
+                            var drivers = _adminCheckoutDrivers.filter(function(u) { return u.role === 'Driver'; });
+                            drivers.sort(function(a, b) { return a.username.localeCompare(b.username); });
+                            drivers.forEach(function(user) {
+                                var opt = document.createElement('option');
+                                opt.value = user.username;
+                                opt.textContent = user.username + (user.carrier ? ' (' + user.carrier + ')' : '');
+                                opt.dataset.carrier = user.carrier || '';
+                                driverSelect.appendChild(opt);
+                            });
+                            if (drivers.length === 0) {
+                                driverSelect.innerHTML = '<option value="" disabled selected>No drivers found</option>';
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            driverSelect.innerHTML = '<option value="" disabled selected>Error loading drivers</option>';
+                        })
+                        .getAllUsers({token: _token});
+                    
+                    // Load available EPJs
+                    var epjSelect = document.getElementById('adminCheckoutEpj');
+                    epjSelect.innerHTML = '<option value="" disabled selected>Loading EPJs...</option>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(epjs) {
+                            epjSelect.innerHTML = '<option value="" disabled selected>Select an EPJ...</option>';
+                            if (epjs && epjs.length > 0) {
+                                epjs.forEach(function(item) {
+                                    if (item.status === 'Available') {
+                                        var opt = document.createElement('option');
+                                        opt.value = item.epj;
+                                        opt.textContent = item.epj + (item.storeOnly ? ' [Store Only]' : '');
+                                        epjSelect.appendChild(opt);
+                                    }
+                                });
+                                if (epjSelect.options.length === 1) {
+                                    epjSelect.innerHTML = '<option value="" disabled selected>No available EPJs</option>';
+                                }
+                            } else {
+                                epjSelect.innerHTML = '<option value="" disabled selected>No available EPJs</option>';
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            epjSelect.innerHTML = '<option value="" disabled selected>Error loading EPJs</option>';
+                        })
+                        .adminGetAllEpjs({token: _token});
+                    
+                    // Show modal
+                    document.getElementById('adminCheckoutModal').classList.add('active');
+                };
+                
+                window.closeAdminCheckoutModal = function() {
+                    document.getElementById('adminCheckoutModal').classList.remove('active');
+                };
+                
+                window.onAdminDriverSelect = function() {
+                    // Could be used to auto-fill carrier info or other fields
+                };
+                
+                window.toggleAdminCheckoutOverspill = function() {
+                    var isOverspill = document.getElementById('adminCheckoutOverspill').checked;
+                    document.getElementById('adminCheckoutEpjSection').style.display = isOverspill ? 'none' : 'block';
+                };
+                
+                window.confirmAdminCheckout = function() {
+                    var driverUsername = document.getElementById('adminCheckoutDriver').value;
+                    var isOverspill = document.getElementById('adminCheckoutOverspill').checked;
+                    var epjNumber = document.getElementById('adminCheckoutEpj').value;
+                    var truckNumber = document.getElementById('adminCheckoutTruck').value.trim();
+                    var trailerNumber = document.getElementById('adminCheckoutTrailer').value.trim();
+                    var route = document.getElementById('adminCheckoutRoute').value.trim();
+                    var feedback = document.getElementById('adminCheckoutFeedback');
+                    var btn = document.getElementById('adminCheckoutConfirmBtn');
+                    
+                    if (!driverUsername) {
+                        feedback.textContent = 'Please select a driver.';
+                        feedback.style.color = 'red';
+                        return;
+                    }
+                    
+                    if (!isOverspill && !epjNumber) {
+                        feedback.textContent = 'Please select an EPJ or check Overspill.';
+                        feedback.style.color = 'red';
+                        return;
+                    }
+                    
+                    // Get driver display name (just username for now)
+                    var driverName = driverUsername;
+                    var selectedDriver = _adminCheckoutDrivers.find(function(d) { return d.username === driverUsername; });
+                    
+                    setButtonLoading(btn, true);
+                    feedback.textContent = 'Processing checkout...';
+                    feedback.style.color = '';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            setButtonLoading(btn, false);
+                            feedback.textContent = message;
+                            feedback.style.color = message.indexOf('Error') === -1 ? 'green' : 'red';
+                            
+                            if (message.indexOf('Error') === -1) {
+                                // Close modal and refresh after success
+                                setTimeout(function() {
+                                    closeAdminCheckoutModal();
+                                    loadDashboardData();
+                                }, 1500);
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            setButtonLoading(btn, false);
+                            feedback.textContent = 'Error: ' + (err.message || 'Unknown error');
+                            feedback.style.color = 'red';
+                        })
+                        .adminCheckoutForDriver({
+                            token: _token,
+                            driverUsername: driverUsername,
+                            driverName: driverName,
+                            epjNumber: epjNumber,
+                            truckNumber: truckNumber,
+                            trailerNumber: trailerNumber,
+                            route: route,
+                            isOverspill: isOverspill
+                        });
+                };
             })();
         </script>
     </body>

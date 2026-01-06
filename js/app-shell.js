@@ -195,7 +195,43 @@
         }
       };
     },
-    sanitize: sanitize
+    sanitize: sanitize,
+    
+    /**
+     * Wrapper for google.script.run with automatic retry and exponential backoff
+     * @param {Object} options Configuration options
+     * @param {string} options.method - The server function name to call
+     * @param {*} options.args - Arguments to pass to the server function
+     * @param {function} options.onSuccess - Success callback
+     * @param {function} options.onError - Error callback
+     * @param {number} options.maxRetries - Maximum retry attempts (default: 3)
+     * @param {number} options.baseDelay - Base delay in ms for exponential backoff (default: 1000)
+     * @returns {void}
+     */
+    runWithRetry({ method, args, onSuccess, onError, maxRetries = 3, baseDelay = 1000 }) {
+      let attempts = 0;
+      
+      const execute = () => {
+        attempts++;
+        google.script.run
+          .withSuccessHandler(result => {
+            if (typeof onSuccess === 'function') onSuccess(result);
+          })
+          .withFailureHandler(error => {
+            if (attempts < maxRetries) {
+              // Exponential backoff: 1s, 2s, 4s...
+              const delay = baseDelay * Math.pow(2, attempts - 1);
+              console.log(`API call to ${method} failed (attempt ${attempts}/${maxRetries}). Retrying in ${delay}ms...`);
+              setTimeout(execute, delay);
+            } else {
+              console.error(`API call to ${method} failed after ${maxRetries} attempts:`, error);
+              if (typeof onError === 'function') onError(error);
+            }
+          })[method](args);
+      };
+      
+      execute();
+    }
   };
 
   window.AppShell = AppShell;

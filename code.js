@@ -44,9 +44,34 @@ function doGet(e) {
 }
 
 // --- UTILITIES ---
+// Targeted cache invalidation functions for better performance
 function clearStateCache() {
   const cache = CacheService.getScriptCache();
   cache.removeAll(['activeTrips', 'epjInfoMap', 'activeDrivers', 'zoneOptions', 'epjStatuses', 'activeDriverNames', 'admin_users', 'admin_maintlog']);
+}
+
+// Clear only trip-related caches (used after check-in/check-out)
+function clearTripCache() {
+  const cache = CacheService.getScriptCache();
+  cache.removeAll(['activeTrips', 'activeDrivers', 'activeDriverNames']);
+}
+
+// Clear only EPJ-related caches (used after EPJ status changes)
+function clearEpjCache() {
+  const cache = CacheService.getScriptCache();
+  cache.removeAll(['epjStatuses', 'epjInfoMap']);
+}
+
+// Clear only user-related caches (used after user management changes)
+function clearUserCache() {
+  const cache = CacheService.getScriptCache();
+  cache.removeAll(['admin_users']);
+}
+
+// Clear only maintenance-related caches
+function clearMaintenanceCache() {
+  const cache = CacheService.getScriptCache();
+  cache.removeAll(['admin_maintlog', 'epjStatuses']);
 }
 
 function updateAllEpjStatuses() {
@@ -58,7 +83,7 @@ function updateAllEpjStatuses() {
   const lastRow = statusSheet.getLastRow();
   if (lastRow < 2) return;
   
-  const epjList = statusSheet.getRange("A2:A" + lastRow).getValues().flat().filter(String);
+  const epjList = statusSheet.getRange("A2:A" + lastRow).getValues().flat().filter(v => v).map(v => String(v).trim());
   const statusMap = {};
   epjList.forEach(epj => { if (epj) statusMap[epj] = 'Available'; });
 
@@ -66,8 +91,8 @@ function updateAllEpjStatuses() {
   for (let i = logData.length - 1; i >= 1; i--) {
     if (processedEpjs.size === epjList.length) break;
     const row = logData[i];
-    const epj = row[6];
-    const status = row[9] ? row[9].trim() : "";
+    const epj = String(row[6] || '').trim();
+    const status = String(row[9] || '').trim();
     if (epj && statusMap.hasOwnProperty(epj) && !processedEpjs.has(epj)) {
       switch (status) {
         case 'Check-Out': statusMap[epj] = 'Checked Out'; processedEpjs.add(epj); break;
@@ -81,7 +106,7 @@ function updateAllEpjStatuses() {
   if (newStatuses.length > 0) {
     statusSheet.getRange(2, 2, newStatuses.length, 1).setValues(newStatuses);
   }
-  clearStateCache();
+  clearEpjCache(); // Only need to invalidate EPJ-related caches
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -113,13 +138,25 @@ function getUserView(token) {
   } else { // Role is 'Driver'
     const activeTrip = findActiveTrip(session.username);
     if (activeTrip) {
-      const template = HtmlService.createTemplateFromFile('CheckInForm');
-      template.username = session.username;
-      template.tripInfo = activeTrip;
-      template.token = token;
-      template.zoneOptions = ''; // Provide empty default for backward compatibility
-      // Don't load zone options here - let client fetch asynchronously
-      return template.evaluate().getContent();
+      // Ensure tripInfo has valid epj property
+      if (!activeTrip.epj) {
+        Logger.log('Warning: activeTrip missing epj property: ' + JSON.stringify(activeTrip));
+        activeTrip.epj = 'Unknown';
+      }
+      try {
+        const template = HtmlService.createTemplateFromFile('CheckInForm');
+        template.username = session.username;
+        // Pass individual values instead of object for better template compatibility
+        template.currentEpj = activeTrip.epj || 'Unknown';
+        template.tripId = activeTrip.tripId || '';
+        template.token = token;
+        template.zoneOptions = ''; // Provide empty default for backward compatibility
+        // Don't load zone options here - let client fetch asynchronously
+        return template.evaluate().getContent();
+      } catch (e) {
+        Logger.log('CheckInForm template error: ' + e.message + ' | activeTrip: ' + JSON.stringify(activeTrip));
+        throw e;
+      }
     } else {
       const template = HtmlService.createTemplateFromFile('CheckOutForm');
       template.username = session.username;
@@ -189,7 +226,8 @@ function loginAndGetUserView(loginData) {
   let user = null;
 
   for (let i = 0; i < data.length; i++) {
-    if (data[i][0] && data[i][0].toLowerCase() === username.toLowerCase() && data[i][1] === passwordHash) {
+    const cellUsername = String(data[i][0] || '').trim();
+    if (cellUsername && cellUsername.toLowerCase() === username.toLowerCase() && data[i][1] === passwordHash) {
       user = { username: data[i][0], role: data[i][2] };
       break;
     }
@@ -231,7 +269,8 @@ function getSession(token) {
 
 function logoutUser(data) {
     if (data && data.token) { CacheService.getScriptCache().remove(data.token); }
-    clearStateCache();
+    // Only clear trip cache on logout - user cache and EPJ info don't change
+    clearTripCache();
     return true;
 }
 
@@ -246,27 +285,43 @@ function processCheckOut(data) {
     const session = getSession(data.token);
     Logger.log('Session: ' + JSON.stringify(session));
     if (!session) throw new Error("Invalid session.");
-    let availableEpjs = getEpjsByStatus('Available');
-    Logger.log('Available EPJs: ' + JSON.stringify(availableEpjs));
-    Logger.log('Requested EPJ: ' + data.epjNumber);
-    // Convert both availableEpjs and data.epjNumber to strings for comparison
-    availableEpjs = availableEpjs.map(String);
-    const requestedEpj = String(data.epjNumber);
-    if (!availableEpjs.includes(requestedEpj)) {
-      Logger.log('EPJ not available error triggered.');
-      return `Error: EPJ ${data.epjNumber} is no longer available. It may have just been checked out.`;
+    
+    const isOverspill = data.isOverspill === true;
+    let startingZone = 'Overspill';
+    
+    // Only validate EPJ if not overspill
+    if (!isOverspill) {
+      let availableEpjs = getEpjsByStatus('Available');
+      Logger.log('Available EPJs: ' + JSON.stringify(availableEpjs));
+      Logger.log('Requested EPJ: ' + data.epjNumber);
+      // Convert both availableEpjs and data.epjNumber to strings for comparison
+      availableEpjs = availableEpjs.map(String);
+      const requestedEpj = String(data.epjNumber);
+      if (!availableEpjs.includes(requestedEpj)) {
+        Logger.log('EPJ not available error triggered.');
+        return `Error: EPJ ${data.epjNumber} is no longer available. It may have just been checked out.`;
+      }
+      const epjInfoMap = getEpjInfoMap();
+      startingZone = epjInfoMap[data.epjNumber] ? epjInfoMap[data.epjNumber].location : 'Unknown';
     }
-    const epjInfoMap = getEpjInfoMap();
-    const startingZone = epjInfoMap[data.epjNumber] ? epjInfoMap[data.epjNumber].location : 'Unknown';
+    
     const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-    const tripId = "TRIP-" + Utilities.getUuid().substring(0, 8).toUpperCase();
-    logSheet.appendRow([tripId, new Date(), session.username, data.driverName, data.truckNumber, data.trailerNumber, data.epjNumber, data.route, startingZone, "Check-Out", data.faultReport, "", ""]);
+    const tripId = (isOverspill ? "OS-" : "TRIP-") + Utilities.getUuid().substring(0, 8).toUpperCase();
+    const epjValue = isOverspill ? 'N/A - Overspill' : data.epjNumber;
+    
+    logSheet.appendRow([tripId, new Date(), session.username, data.driverName, data.truckNumber, data.trailerNumber, epjValue, data.route, startingZone, "Check-Out", data.faultReport, "", ""]);
     SpreadsheetApp.flush();
-    updateAllEpjStatuses();
-    // Invalidate again after status update
-    CacheService.getScriptCache().remove('epjStatuses');
-    Logger.log('Check-Out successful for EPJ: ' + data.epjNumber);
-    return `Successfully checked out EPJ ${data.epjNumber}.`;
+    
+    // Only update EPJ statuses if not overspill
+    if (!isOverspill) {
+      updateAllEpjStatuses();
+      CacheService.getScriptCache().remove('epjStatuses');
+      Logger.log('Check-Out successful for EPJ: ' + data.epjNumber);
+      return `Successfully checked out EPJ ${data.epjNumber}.`;
+    } else {
+      Logger.log('Overspill Check-Out successful');
+      return `Successfully checked out for Overspill (no EPJ assigned).`;
+    }
   } finally {
     lock.releaseLock();
   }
@@ -286,6 +341,75 @@ function processCheckIn(data) {
   updateAllEpjStatuses();
   CacheService.getScriptCache().remove('epjStatuses');
   return `Successfully checked in EPJ ${activeTrip.epj}.`;
+}
+
+/**
+ * Driver EPJ swap - allows a driver to swap their own EPJ mid-trip
+ */
+function driverSwapEpj(data) {
+  const session = getSession(data.token);
+  if (!session) throw new Error("Invalid session.");
+  
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  
+  try {
+    // Find driver's active trip
+    const activeTrip = findActiveTrip(session.username);
+    if (!activeTrip) {
+      return "Error: No active trip found.";
+    }
+    
+    // Verify the new EPJ is available
+    CacheService.getScriptCache().remove('epjStatuses');
+    let availableEpjs = getEpjsByStatus('Available').map(String);
+    if (!availableEpjs.includes(String(data.newEpj))) {
+      return `Error: EPJ ${data.newEpj} is no longer available.`;
+    }
+    
+    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const now = new Date();
+    
+    // Step 1: Check in the old EPJ
+    logSheet.appendRow([
+      activeTrip.tripId, now, session.username, activeTrip.driver, "", "",
+      activeTrip.epj, "", activeTrip.zone, "Check-In", "", 
+      data.currentLocation || activeTrip.zone,
+      `Driver swapped EPJ - returning ${activeTrip.epj}`
+    ]);
+    
+    // Step 2: If there's an issue with the old EPJ, log it to maintenance
+    if (data.issueReport && data.issueReport.trim()) {
+      const maintSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MAINT_LOG_SHEET_NAME);
+      maintSheet.appendRow([now, activeTrip.epj, 'Issue Reported', data.issueReport, '']);
+      logSheet.appendRow([
+        '', now, session.username, activeTrip.driver, '', '',
+        activeTrip.epj, '', '', 'Maintenance Start', data.issueReport, '', ''
+      ]);
+    }
+    
+    // Step 3: Check out the new EPJ with a new trip ID
+    const newTripId = "SWAP-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+    const epjInfoMap = getEpjInfoMap();
+    const newEpjZone = epjInfoMap[data.newEpj] ? epjInfoMap[data.newEpj].location : 'Unknown';
+    
+    logSheet.appendRow([
+      newTripId, now, session.username, activeTrip.driver, 
+      activeTrip.truck, activeTrip.trailer,
+      data.newEpj, activeTrip.route, newEpjZone, "Check-Out", 
+      `Driver swap - Replaced ${activeTrip.epj}`, '', ''
+    ]);
+    
+    SpreadsheetApp.flush();
+    updateAllEpjStatuses();
+    // Clear trip and EPJ caches since both changed
+    clearTripCache();
+    clearEpjCache();
+    
+    return `Success! Swapped to EPJ ${data.newEpj}. Your old EPJ ${activeTrip.epj} has been checked in.`;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function driverChangePassword(data) {
@@ -320,41 +444,81 @@ function getRecentDriverLogins(data) {
   const minutesBack = data.minutesBack || 2; // Default to last 2 minutes
   const cutoffTime = new Date(Date.now() - (minutesBack * 60 * 1000));
   
-  const loginLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_LOG_SHEET_NAME);
-  if (!loginLogSheet || loginLogSheet.getLastRow() < 2) return [];
-  
-  // Get recent rows (last 50 to be efficient)
-  const lastRow = loginLogSheet.getLastRow();
-  const startRow = Math.max(2, lastRow - 49);
-  const numRows = lastRow - startRow + 1;
-  const logData = loginLogSheet.getRange(startRow, 1, numRows, 2).getValues(); // Timestamp, Username
-  
   // Get user info to filter drivers only
   const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
   const userData = userSheet.getRange(2, 1, userSheet.getLastRow() - 1, 3).getValues();
   const userRoles = {};
-  userData.forEach(row => { if (row[0]) userRoles[row[0].toLowerCase()] = row[2]; });
+  userData.forEach(row => { 
+    const uname = String(row[0] || '').trim();
+    if (uname) userRoles[uname.toLowerCase()] = row[2]; 
+  });
   
   const recentLogins = [];
-  for (let i = logData.length - 1; i >= 0; i--) {
-    const timestamp = new Date(logData[i][0]);
-    const username = logData[i][1];
+  
+  // Check login log for fresh logins
+  const loginLogSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOGIN_LOG_SHEET_NAME);
+  if (loginLogSheet && loginLogSheet.getLastRow() >= 2) {
+    const lastRow = loginLogSheet.getLastRow();
+    const startRow = Math.max(2, lastRow - 49);
+    const numRows = lastRow - startRow + 1;
+    const logData = loginLogSheet.getRange(startRow, 1, numRows, 2).getValues(); // Timestamp, Username
     
-    if (timestamp >= cutoffTime) {
-      const role = userRoles[username.toLowerCase()];
-      if (role === 'Driver') {
-        recentLogins.push({
-          username: username,
-          timestamp: timestamp.toLocaleTimeString(),
-          timestampMs: timestamp.getTime()
-        });
+    for (let i = logData.length - 1; i >= 0; i--) {
+      const timestamp = new Date(logData[i][0]);
+      const username = String(logData[i][1] || '').trim();
+      
+      if (timestamp >= cutoffTime && username) {
+        const role = userRoles[username.toLowerCase()];
+        if (role === 'Driver') {
+          recentLogins.push({
+            username: username,
+            timestamp: timestamp.toLocaleTimeString(),
+            timestampMs: timestamp.getTime(),
+            eventType: 'login',
+            isSwap: false
+          });
+        }
+      } else if (timestamp < cutoffTime) {
+        break; // Older entries, stop checking
       }
-    } else {
-      break; // Older entries, stop checking
     }
   }
   
-  return recentLogins;
+  // Check main log for recent EPJ swaps
+  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  if (logSheet && logSheet.getLastRow() >= 2) {
+    const lastRow = logSheet.getLastRow();
+    const startRow = Math.max(2, lastRow - 49);
+    const numRows = lastRow - startRow + 1;
+    const swapData = logSheet.getRange(startRow, 1, numRows, 11).getValues(); // TripID, Timestamp, Username, Driver, ... EPJ, ... Status, Notes
+    
+    for (let i = swapData.length - 1; i >= 0; i--) {
+      const tripId = String(swapData[i][0] || '');
+      const timestamp = new Date(swapData[i][1]);
+      const username = String(swapData[i][2] || '').trim();
+      const driverName = String(swapData[i][3] || '').trim();
+      const epj = String(swapData[i][6] || '').trim();
+      const status = String(swapData[i][9] || '').trim();
+      const notes = String(swapData[i][10] || '');
+      
+      if (timestamp >= cutoffTime && tripId.startsWith('SWAP-') && status === 'Check-Out') {
+        recentLogins.push({
+          username: driverName || username,
+          timestamp: timestamp.toLocaleTimeString(),
+          timestampMs: timestamp.getTime(),
+          eventType: 'swap',
+          isSwap: true,
+          newEpj: epj,
+          notes: notes
+        });
+      } else if (timestamp < cutoffTime) {
+        break;
+      }
+    }
+  }
+  
+  // Sort by timestamp descending and return
+  return recentLogins.sort((a, b) => b.timestampMs - a.timestampMs);
 }
 
 function getDashboardData(data) {
@@ -444,6 +608,155 @@ function adminForceCheckIn(data) {
   return `Error: Could not find original trip ID ${data.tripId}.`;
 }
 
+/**
+ * Admin checkout - allows admin to check out an EPJ on behalf of a driver
+ */
+function adminCheckoutForDriver(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  
+  try {
+    CacheService.getScriptCache().remove('epjStatuses');
+    
+    const isOverspill = data.isOverspill === true;
+    let startingZone = 'Overspill';
+    
+    // Only validate EPJ if not overspill
+    if (!isOverspill && data.epjNumber) {
+      let availableEpjs = getEpjsByStatus('Available').map(String);
+      if (!availableEpjs.includes(String(data.epjNumber))) {
+        return `Error: EPJ ${data.epjNumber} is no longer available.`;
+      }
+      const epjInfoMap = getEpjInfoMap();
+      startingZone = epjInfoMap[data.epjNumber] ? epjInfoMap[data.epjNumber].location : 'Unknown';
+    }
+    
+    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const tripId = "ADMIN-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+    const epjValue = isOverspill ? 'N/A - Overspill' : data.epjNumber;
+    
+    // Log with driverUsername for tracking, but use data.driverName for display
+    logSheet.appendRow([
+      tripId, 
+      new Date(), 
+      data.driverUsername || data.driverName, // Username for system tracking
+      data.driverName,  // Display name
+      data.truckNumber || '', 
+      data.trailerNumber || '', 
+      epjValue, 
+      data.route || 'Admin Checkout', 
+      startingZone, 
+      "Check-Out", 
+      `Admin checkout by ${session.username}`, 
+      "", 
+      ""
+    ]);
+    
+    SpreadsheetApp.flush();
+    
+    if (!isOverspill && data.epjNumber) {
+      updateAllEpjStatuses();
+    }
+    // Clear trip and EPJ caches since both changed
+    clearTripCache();
+    if (data.epjNumber) clearEpjCache();
+    
+    if (isOverspill) {
+      return `Successfully checked out ${data.driverName} for Overspill (no EPJ).`;
+    }
+    return `Successfully checked out EPJ ${data.epjNumber} for ${data.driverName}.`;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Swap a driver's EPJ mid-trip
+ * - Checks in the old EPJ (optionally putting it in maintenance)
+ * - Checks out a new EPJ for the same trip
+ */
+function adminSwapEpj(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+  
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  
+  try {
+    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const logData = logSheet.getDataRange().getValues();
+    
+    // Find the original trip to get details
+    let originalTrip = null;
+    for (let i = logData.length - 1; i >= 1; i--) {
+      if (logData[i][0] === data.tripId) {
+        originalTrip = logData[i];
+        break;
+      }
+    }
+    
+    if (!originalTrip) {
+      return `Error: Could not find trip ${data.tripId}.`;
+    }
+    
+    // Verify the new EPJ is available
+    CacheService.getScriptCache().remove('epjStatuses');
+    let availableEpjs = getEpjsByStatus('Available').map(String);
+    if (!availableEpjs.includes(String(data.newEpj))) {
+      return `Error: EPJ ${data.newEpj} is no longer available.`;
+    }
+    
+    const originalDriver = originalTrip[3];
+    const originalZone = originalTrip[8];
+    const truck = originalTrip[4];
+    const trailer = originalTrip[5];
+    const route = originalTrip[7];
+    const now = new Date();
+    
+    // Step 1: Check in the old EPJ
+    logSheet.appendRow([
+      data.tripId, now, session.username, originalDriver, "", "",
+      data.oldEpj, "", originalZone, "Check-In", "", "EPJ Swap",
+      `EPJ swapped by admin ${session.username} - Old EPJ returned`
+    ]);
+    
+    // Step 2: If requested, put old EPJ in maintenance
+    if (data.putInMaintenance) {
+      const maintSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MAINT_LOG_SHEET_NAME);
+      const reason = data.maintenanceReason || 'Issue reported during swap';
+      maintSheet.appendRow([now, data.oldEpj, 'Maintenance Start', reason, '']);
+      logSheet.appendRow([
+        '', now, session.username, 'ADMIN', '', '',
+        data.oldEpj, '', '', 'Maintenance Start', reason, '', ''
+      ]);
+    }
+    
+    // Step 3: Check out the new EPJ with a new trip ID
+    const newTripId = "SWAP-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+    const epjInfoMap = getEpjInfoMap();
+    const newEpjZone = epjInfoMap[data.newEpj] ? epjInfoMap[data.newEpj].location : 'Unknown';
+    
+    logSheet.appendRow([
+      newTripId, now, data.driverUsername, data.driverName, truck, trailer,
+      data.newEpj, route, newEpjZone, "Check-Out", 
+      `EPJ swap - Replaced ${data.oldEpj}`, '', ''
+    ]);
+    
+    SpreadsheetApp.flush();
+    updateAllEpjStatuses();
+    // Clear trip and EPJ caches since both changed
+    clearTripCache();
+    clearEpjCache();
+    
+    return `Success! Swapped ${data.oldEpj} → ${data.newEpj} for ${data.driverName}`;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function updateEpjLocation(data) {
     const session = getSession(data.token);
     if (!session || (session.role !== 'Admin' && session.role !== 'Load Support')) { throw new Error("Permission denied."); }
@@ -524,12 +837,30 @@ function adminEditUser(data) {
   if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
   const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
   const usernames = userSheet.getRange("A:A").getValues();
+  
+  // If changing username, check if new username already exists
+  if (data.newUsername && data.newUsername.toLowerCase() !== data.username.toLowerCase()) {
+    for (let i = 1; i < usernames.length; i++) {
+      const cellUsername = String(usernames[i][0] || '').trim();
+      if (cellUsername && cellUsername.toLowerCase() === data.newUsername.toLowerCase()) {
+        return `Error: Username "${data.newUsername}" already exists.`;
+      }
+    }
+  }
+  
   for (let i = 1; i < usernames.length; i++) {
-    if (usernames[i][0].toLowerCase() === data.username.toLowerCase()) {
+    const cellUsername = String(usernames[i][0] || '').trim();
+    if (cellUsername && cellUsername.toLowerCase() === data.username.toLowerCase()) {
+      // Update username if provided and different
+      if (data.newUsername && data.newUsername !== data.username) {
+        userSheet.getRange(i + 1, 1).setValue(data.newUsername);
+      }
       userSheet.getRange(i + 1, 3).setValue(data.role);
       userSheet.getRange(i + 1, 4).setValue(data.carrier);
       CacheService.getScriptCache().remove('admin_users');
-      return `User "${data.username}" updated successfully.`;
+      
+      const displayName = data.newUsername || data.username;
+      return `User "${displayName}" updated successfully.`;
     }
   }
   return `Error: User "${data.username}" not found.`;
@@ -592,7 +923,8 @@ function adminResetPassword(data) {
     const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
     const usernames = userSheet.getRange("A:A").getValues();
     for (let i = 1; i < usernames.length; i++) {
-        if (usernames[i][0].toLowerCase() === data.username.toLowerCase()) {
+        const cellUsername = String(usernames[i][0] || '').trim();
+        if (cellUsername && cellUsername.toLowerCase() === data.username.toLowerCase()) {
             userSheet.getRange(i + 1, 2).setValue(sha256(data.newPassword));
             return `Password reset for user "${data.username}".`;
         }
@@ -606,7 +938,8 @@ function adminDeleteUser(data) {
   const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
   const usernames = userSheet.getRange("A:A").getValues();
   for (let i = usernames.length - 1; i > 0; i--) { 
-    if (usernames[i][0].toLowerCase() === data.username.toLowerCase()) {
+    const cellUsername = String(usernames[i][0] || '').trim();
+    if (cellUsername && cellUsername.toLowerCase() === data.username.toLowerCase()) {
       userSheet.deleteRow(i + 1);
       CacheService.getScriptCache().remove('admin_users');
       return `User "${data.username}" has been deleted.`;
@@ -673,7 +1006,7 @@ function getEpjInfoMap() {
     const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
     const logData = logSheet.getDataRange().getValues();
     const epjStatusSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STATUS_SHEET_NAME);
-    const epjs = epjStatusSheet.getRange("A2:A").getValues().flat().filter(String);
+    const epjs = epjStatusSheet.getRange("A2:A").getValues().flat().filter(v => v).map(v => String(v).trim());
     const infoMap = {};
     const foundLocations = new Set();
     const foundFaults = new Set();
@@ -681,8 +1014,8 @@ function getEpjInfoMap() {
     for (let i = logData.length - 1; i >= 1; i--) {
         if (foundLocations.size === epjs.length && foundFaults.size === epjs.length) { break; }
         const row = logData[i];
-        const epj = row[6];
-        if (!infoMap[epj] || (foundLocations.has(epj) && foundFaults.has(epj))) { continue; }
+        const epj = String(row[6] || '').trim();
+        if (!epj || !infoMap[epj] || (foundLocations.has(epj) && foundFaults.has(epj))) { continue; }
         if (!foundLocations.has(epj)) {
             const eventType = row[9];
             const checkInLocation = row[11];
@@ -711,30 +1044,99 @@ function getEpjInfoMap() {
 function getActiveCheckouts() {
     const cache = CacheService.getScriptCache();
     const cached = cache.get('activeTrips');
-    if (cached != null) { return JSON.parse(cached); }
-    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-    if (!logSheet) { return []; }
-    const lastRow = logSheet.getLastRow();
-    if (lastRow < 2) return [];
-    const data = logSheet.getRange(2, 1, lastRow - 1, 13).getValues();
-    const activeTrips = {};
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const tripId = row[0];
-      if (!tripId) continue;
-      const status = row[9];
-      if (status === 'Check-Out') {
-        activeTrips[tripId] = {
-          tripId: tripId, timestamp: new Date(row[1]).toLocaleString(), driverUsername: row[2],
-          driver: row[3], truck: row[4], trailer: row[5], epj: row[6], route: row[7], zone: row[8]
-        };
-      } else if (status === 'Check-In') {
-        if(activeTrips[tripId]) { delete activeTrips[tripId]; }
-      }
+    let result;
+    
+    if (cached != null) {
+        result = JSON.parse(cached);
+    } else {
+        const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+        if (!logSheet) { return []; }
+        const lastRow = logSheet.getLastRow();
+        if (lastRow < 2) return [];
+        const data = logSheet.getRange(2, 1, lastRow - 1, 15).getValues(); // Extended to column O (15)
+        const activeTrips = {};
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
+          const tripId = row[0];
+          if (!tripId) continue;
+          const status = String(row[9] || '').trim();
+          if (status === 'Check-Out') {
+            const checkoutTime = new Date(row[1]);
+            const notes = String(row[10] || ''); // Notes field contains swap info
+            
+            // Detect if this is a swap checkout - check tripId prefix OR notes content
+            const tripIdStr = String(tripId);
+            const isSwap = tripIdStr.startsWith('SWAP-') || notes.toLowerCase().includes('epj swap') || notes.toLowerCase().includes('replaced');
+            let swappedFrom = null;
+            if (isSwap && notes) {
+              // Extract old EPJ from notes like "EPJ swap - Replaced EPJ-001" or "Replaced EPJ001"
+              const swapMatch = notes.match(/Replaced\s+([^\s,]+)/i);
+              if (swapMatch) swappedFrom = swapMatch[1];
+            }
+            
+            // Column O (index 14) contains the worked status
+            const workedStatus = String(row[14] || '').toUpperCase();
+            const isWorked = workedStatus === 'YES' || workedStatus === 'TRUE';
+            
+            activeTrips[tripId] = {
+              tripId: tripId, timestamp: checkoutTime.toLocaleString(), timestampMs: checkoutTime.getTime(),
+              driverUsername: String(row[2] || ''),
+              driver: String(row[3] || ''), truck: String(row[4] || ''), trailer: String(row[5] || ''), 
+              epj: String(row[6] || ''), route: String(row[7] || ''), zone: String(row[8] || ''),
+              isSwap: isSwap,
+              swappedFrom: swappedFrom,
+              worked: isWorked
+            };
+          } else if (status === 'Check-In') {
+            if(activeTrips[tripId]) { delete activeTrips[tripId]; }
+          }
+        }
+        result = Object.values(activeTrips);
+        cache.put('activeTrips', JSON.stringify(result), 30);
     }
-    const result = Object.values(activeTrips);
-    cache.put('activeTrips', JSON.stringify(result), 21600);
-    return result;
+    
+    // Always sort by timestamp descending (newest first) - ensures consistency
+    return result.sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+}
+
+/**
+ * Get active checkouts for admin dashboard - lightweight call for frequent polling
+ */
+function getActiveCheckoutsForAdmin(data) {
+    const session = getSession(data.token);
+    if (!session || session.role !== 'Admin') throw new Error("Permission denied.");
+    
+    // Get user map for carrier info
+    const cache = CacheService.getScriptCache();
+    let userMap = {};
+    let usersCached = cache.get('admin_users');
+    if (usersCached) {
+        JSON.parse(usersCached).forEach(u => { userMap[u.username] = u; });
+    } else {
+        const userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(USER_SHEET_NAME);
+        if (userSheet) {
+            const lastRow = userSheet.getLastRow();
+            if (lastRow > 1) {
+                const usersData = userSheet.getRange(2, 1, lastRow - 1, 4).getValues();
+                usersData.forEach(row => {
+                    if (row[0]) userMap[row[0]] = { username: row[0], role: row[2], carrier: row[3] || '' };
+                });
+            }
+        }
+    }
+    
+    // Force fresh data by clearing active trips cache
+    if (data.forceRefresh) {
+        cache.remove('activeTrips');
+    }
+    
+    const activeCheckouts = getActiveCheckouts().map(checkout => {
+        const driverInfo = userMap[checkout.driverUsername];
+        checkout.carrier = driverInfo ? driverInfo.carrier : 'N/A';
+        return checkout;
+    });
+    
+    return activeCheckouts;
 }
 
 function findActiveTrip(username) {
@@ -763,7 +1165,7 @@ function getZoneOptions() {
     if (cached != null) { return cached; }
     const zoneSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ZONES_SHEET_NAME);
     if (!zoneSheet) return "";
-    const zones = zoneSheet.getRange("A2:A").getValues().flat().filter(String);
+    const zones = zoneSheet.getRange("A1:A").getValues().flat().filter(String);
     let options = '';
     zones.forEach(zone => { options += `<option value="${zone}">${zone}</option>`; });
     cache.put('zoneOptions', options, 21600);
@@ -783,8 +1185,8 @@ function getEpjsByStatus(status, all = false) {
     // Updated to include column C for store-only flag
     const values = sheet.getRange("A2:C" + sheet.getLastRow()).getValues();
     allStatuses = values.map(row => ({
-      epj: row[0], 
-      status: row[1],
+      epj: String(row[0] || '').trim(), 
+      status: String(row[1] || '').trim(),
       storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes'
     })).filter(item => item.epj);
     cache.put(cacheKey, JSON.stringify(allStatuses), 21600);
@@ -806,13 +1208,16 @@ function getAllEpjsWithDetails(data) {
   const values = sheet.getRange("A2:C" + sheet.getLastRow()).getValues();
   const epjInfoMap = getEpjInfoMap();
   
-  return values.map(row => ({
-    epj: row[0],
-    status: row[1],
-    storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes',
-    location: epjInfoMap[row[0]] ? epjInfoMap[row[0]].location : 'N/A',
-    fault: epjInfoMap[row[0]] ? epjInfoMap[row[0]].fault : 'No issues reported'
-  })).filter(item => item.epj);
+  return values.map(row => {
+    const epjStr = String(row[0] || '').trim();
+    return {
+      epj: epjStr,
+      status: String(row[1] || '').trim(),
+      storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes',
+      location: epjInfoMap[epjStr] ? epjInfoMap[epjStr].location : 'N/A',
+      fault: epjInfoMap[epjStr] ? epjInfoMap[epjStr].fault : 'No issues reported'
+    };
+  }).filter(item => item.epj);
 }
 
 // Quick update EPJ status (for right-click menu)
@@ -830,15 +1235,31 @@ function adminQuickUpdateEpjStatus(data) {
     if (epjList[i] === epj) {
       statusSheet.getRange(i + 2, 2).setValue(newStatus);
       
-      // Log the status change
+      // Log the status change with proper event type that updateAllEpjStatuses() recognizes
       const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      
+      // Map status to event type
+      let eventType = 'Admin Status Override';
+      if (newStatus === 'Checked Out') {
+        eventType = 'Check-Out';
+      } else if (newStatus === 'Available') {
+        eventType = 'Check-In';
+      } else if (newStatus === 'Maintenance') {
+        eventType = 'Maintenance Start';
+      }
+      
+      // Generate a trip ID for Check-Out events so they can be force checked in later
+      const tripId = (eventType === 'Check-Out') ? "ADMIN-" + Utilities.getUuid().substring(0, 8).toUpperCase() : '';
+      
       logSheet.appendRow([
-        '', new Date(), session.username, 'ADMIN', '', '', 
-        epj, '', '', 'Admin Status Override', 
-        `Status changed to ${newStatus}`, '', ''
+        tripId, new Date(), session.username, 'ADMIN OVERRIDE', '', '', 
+        epj, '', '', eventType, 
+        `Admin set status to ${newStatus}`, '', ''
       ]);
       
-      CacheService.getScriptCache().remove('epjStatuses');
+      // Clear EPJ and trip caches since status and possibly trip changed
+      clearEpjCache();
+      if (eventType === 'Check-Out' || eventType === 'Check-In') clearTripCache();
       return `EPJ ${epj} status updated to ${newStatus}`;
     }
   }
@@ -951,6 +1372,41 @@ function adminRemoveEpj(data) {
 }
 
 // Get list of all EPJs for management
+/**
+ * Update the worked status for a checkout (column O)
+ */
+function adminUpdateWorkedStatus(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const tripId = data.tripId;
+  const worked = data.worked === true;
+  
+  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) throw new Error('Log sheet not found.');
+  
+  const lastRow = logSheet.getLastRow();
+  if (lastRow < 2) throw new Error('No data in log sheet.');
+  
+  // Find the row with this tripId and Check-Out status
+  const tripIds = logSheet.getRange('A2:A' + lastRow).getValues().flat();
+  const statuses = logSheet.getRange('J2:J' + lastRow).getValues().flat();
+  
+  for (let i = 0; i < tripIds.length; i++) {
+    if (tripIds[i] === tripId && statuses[i] === 'Check-Out') {
+      // Update column O (column 15)
+      logSheet.getRange(i + 2, 15).setValue(worked ? 'YES' : 'NO');
+      
+      // Clear active trips cache so the change shows up immediately
+      CacheService.getScriptCache().remove('activeTrips');
+      
+      return { success: true, tripId: tripId, worked: worked };
+    }
+  }
+  
+  throw new Error('Trip ' + tripId + ' not found.');
+}
+
 function adminGetAllEpjs(data) {
   const session = getSession(data.token);
   if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
@@ -960,8 +1416,8 @@ function adminGetAllEpjs(data) {
   
   const values = statusSheet.getRange('A2:C' + statusSheet.getLastRow()).getValues();
   return values.filter(row => row[0]).map(row => ({
-    epj: row[0],
-    status: row[1],
+    epj: String(row[0] || '').trim(),
+    status: String(row[1] || '').trim(),
     storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes'
   }));
 }

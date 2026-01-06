@@ -14,49 +14,6 @@
             vertical-align: middle;
         }
         
-        /* Store delivery indicator */
-        .store-only-note {
-            background: #e3f2fd;
-            border-left: 4px solid #1976d2;
-            padding: 0.75rem;
-            margin: 1rem 0;
-            border-radius: 0.25rem;
-            font-size: 0.9rem;
-        }
-        
-        .store-badge {
-            background: #1976d2;
-            color: white;
-            padding: 0.2rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-left: 0.5rem;
-        }
-        
-        /* Store EPJ section */
-        .store-epj-section {
-            background: #fff3e0;
-            border: 1px solid #ff9800;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin: 1.5rem 0;
-        }
-        
-        .store-epj-section label {
-            margin-bottom: 0.5rem;
-            color: #e65100;
-            font-weight: 600;
-        }
-        
-        .store-epj-section select {
-            margin-bottom: 0;
-        }
-        
-        .store-epj-section small {
-            color: #666;
-        }
-        
         /* Loading spinner for buttons */
         .btn-loading {
             position: relative;
@@ -86,6 +43,52 @@
         @keyframes btn-spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* EPJ Swap Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: var(--pico-background-color, #fff);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            max-width: 450px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .modal-header h3 {
+            margin: 0;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: auto;
+        }
+        .modal-close:hover {
+            color: var(--pico-primary);
+        }
     </style>
 </head>
 <body>
@@ -98,12 +101,12 @@
             
             <h2>Driver Check-In</h2>
             <p>Welcome back, <b><?!= username; ?></b></p>
-            <p>You currently have <b>EPJ <?!= tripInfo.epj; ?></b> checked out.</p>
+            <p>You currently have <b>EPJ <?!= currentEpj; ?></b> checked out.</p>
             
-            <div id="storeOnlyNotice" style="display: none;" class="store-only-note">
-                🏪 <strong>Store Delivery EPJ:</strong> This EPJ is designated for store deliveries only.
-            </div>
-
+            <button id="changeEpjBtn" class="outline secondary" style="margin-bottom: 1rem;" onclick="openEpjSwapModal()">
+                🔄 Need a Different EPJ?
+            </button>
+            
             <label for="checkInZone">Final Location of EPJ</label>
             <select id="checkInZone" disabled>
                 <option>Loading zones...</option>
@@ -117,25 +120,49 @@
                 I confirm that the EPJ is plugged in and ready for the next driver.
             </label>
 
-            <!-- Store Delivery EPJ Quick Checkout Section -->
-            <div id="storeEpjSection" class="store-epj-section">
-                <label for="storeEpjSelect">Quick Checkout Store Delivery EPJ (Optional)</label>
-                <select id="storeEpjSelect" disabled>
-                    <option value="">Loading store EPJs...</option>
-                </select>
-                <small>Select an EPJ if you need one for a store delivery after this check-in.</small>
-            </div>
 
             <button id="checkInBtn" onclick="doCheckIn()" disabled><span>Complete Check-In</span></button>
             <p id="feedback" style="text-align:center; min-height:20px;">Loading...</p>
         </article>
+        
+        <!-- EPJ Swap Modal -->
+        <div id="epjSwapModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Change Your EPJ</h3>
+                    <button class="modal-close" onclick="closeEpjSwapModal()">&times;</button>
+                </div>
+                
+                <p style="margin-bottom: 1rem;">Current EPJ: <strong><?!= currentEpj; ?></strong></p>
+                
+                <label for="swapNewEpj">Select New EPJ</label>
+                <select id="swapNewEpj">
+                    <option value="" disabled selected>Loading available EPJs...</option>
+                </select>
+                
+                <label for="swapCurrentLocation">Where is your current EPJ?</label>
+                <select id="swapCurrentLocation">
+                    <option value="">Loading zones...</option>
+                </select>
+                
+                <label for="swapIssueReport">Issue with current EPJ? (optional)</label>
+                <textarea id="swapIssueReport" placeholder="e.g., Battery died, forks not lifting properly..."></textarea>
+                <small style="display:block; margin-top:-0.5rem; margin-bottom:1rem; color:var(--pico-muted-color);">If you report an issue, the EPJ will be flagged for maintenance.</small>
+                
+                <div class="grid">
+                    <button class="secondary" onclick="closeEpjSwapModal()">Cancel</button>
+                    <button id="swapConfirmBtn" onclick="confirmEpjSwap()"><span>Confirm Swap</span></button>
+                </div>
+                
+                <p id="swapFeedback" style="text-align:center; min-height:20px; margin-top:1rem;"></p>
+            </div>
+        </div>
     </main>
     <script>
         (function() {
             // Use the parent's sessionToken - do NOT redeclare with var/let/const
             var _token = (typeof sessionToken !== 'undefined' && sessionToken) ? sessionToken : "<?= token ?>";
-            var _currentEpj = "<?!= tripInfo.epj; ?>";
-            var _storeEpjsAvailable = [];
+            var _currentEpj = "<?!= currentEpj; ?>";
             
             // Load zone options and EPJ details asynchronously
             function loadCheckinData() {
@@ -150,15 +177,6 @@
                         if (checkInBtn) checkInBtn.disabled = false;
                         var feedback = document.getElementById('feedback');
                         if (feedback) feedback.innerText = '';
-                        
-                        // Check if current EPJ is store-only and show notice
-                        if (data.currentEpjIsStoreOnly) {
-                            var notice = document.getElementById('storeOnlyNotice');
-                            if (notice) notice.style.display = 'block';
-                        }
-                        
-                        // Load store EPJs for quick checkout
-                        loadStoreEpjs();
                     })
                     .withFailureHandler(function(error) {
                         var feedback = document.getElementById('feedback');
@@ -167,49 +185,6 @@
                         }
                     })
                     .getCheckinFormData({token: _token, epj: _currentEpj});
-            }
-            
-            // Load store-only EPJs for quick checkout dropdown
-            function loadStoreEpjs() {
-                google.script.run
-                    .withSuccessHandler(function(data) {
-                        var selectEl = document.getElementById('storeEpjSelect');
-                        if (!selectEl) return;
-                        
-                        // Enable the dropdown
-                        selectEl.disabled = false;
-                        
-                        if (!data || !data.availableEpjs) {
-                            selectEl.innerHTML = '<option value="">None - Just check in</option>';
-                            return;
-                        }
-                        
-                        // Filter for store-only EPJs that are available
-                        _storeEpjsAvailable = data.availableEpjs.filter(function(item) {
-                            return item.storeOnly === true;
-                        });
-                        
-                        // Always show the dropdown with "None" as first option
-                        selectEl.innerHTML = '<option value="">None - Just check in</option>';
-                        
-                        if (_storeEpjsAvailable.length > 0) {
-                            _storeEpjsAvailable.forEach(function(item) {
-                                var option = document.createElement('option');
-                                option.value = item.epj;
-                                option.textContent = item.epj + ' (Store Delivery)';
-                                selectEl.appendChild(option);
-                            });
-                        }
-                    })
-                    .withFailureHandler(function(error) {
-                        var selectEl = document.getElementById('storeEpjSelect');
-                        if (selectEl) {
-                            selectEl.disabled = false;
-                            selectEl.innerHTML = '<option value="">None - Just check in</option>';
-                        }
-                        console.log('Could not load store EPJs: ' + (error.message || 'Unknown error'));
-                    })
-                    .getCheckoutFormData({token: _token});
             }
             
             // Check-in function - exposed to global scope for onclick
@@ -240,10 +215,6 @@
                 var feedback = document.getElementById('feedback');
                 if (feedback) feedback.innerText = '';
                 
-                // Get selected store EPJ (if any)
-                var storeEpjSelect = document.getElementById('storeEpjSelect');
-                var selectedStoreEpj = storeEpjSelect ? storeEpjSelect.value : '';
-                
                 google.script.run
                     .withSuccessHandler(function(message) {
                         if (message && message.startsWith && message.startsWith('Error:')) {
@@ -254,63 +225,16 @@
                             }
                             alert(message);
                         } else {
-                            // If a store EPJ was selected, auto-checkout it for store delivery
-                            if (selectedStoreEpj) {
-                                var article = document.querySelector('article');
-                                if (article) {
-                                    article.innerHTML = 
-                                        '<h2>Check-In Complete!</h2>' +
-                                        '<p>' + message + '</p>' +
-                                        '<p>Processing store delivery checkout for EPJ ' + selectedStoreEpj + '...</p>';
-                                }
-                                // Auto-checkout the store EPJ with blank truck/trailer info
-                                google.script.run
-                                    .withSuccessHandler(function(checkoutMsg) {
-                                        var article = document.querySelector('article');
-                                        if (article) {
-                                            article.innerHTML = 
-                                                '<h2>All Done!</h2>' +
-                                                '<p>Check-in complete and EPJ ' + selectedStoreEpj + ' checked out for store delivery.</p>' +
-                                                '<p>Returning to login screen...</p>';
-                                        }
-                                        setTimeout(function() {
-                                            if (typeof logout === 'function') logout();
-                                        }, 2500);
-                                    })
-                                    .withFailureHandler(function(err) {
-                                        var article = document.querySelector('article');
-                                        if (article) {
-                                            article.innerHTML = 
-                                                '<h2>Check-In Complete</h2>' +
-                                                '<p>' + message + '</p>' +
-                                                '<p style="color:red">Note: Could not auto-checkout store EPJ: ' + (err.message || 'Unknown error') + '</p>' +
-                                                '<p>Returning to login screen...</p>';
-                                        }
-                                        setTimeout(function() {
-                                            if (typeof logout === 'function') logout();
-                                        }, 3000);
-                                    })
-                                    .processCheckOut({
-                                        token: _token,
-                                        driverName: '<?!= username; ?>',
-                                        truckNumber: 'STORE',
-                                        trailerNumber: 'DELIVERY',
-                                        route: 'Store Delivery',
-                                        epjNumber: selectedStoreEpj,
-                                        faultReport: ''
-                                    });
-                            } else {
-                                var article = document.querySelector('article');
-                                if (article) {
-                                    article.innerHTML = 
-                                        '<h2>Success!</h2>' +
-                                        '<p>' + message + '</p>' +
-                                        '<p>Returning to login screen...</p>';
-                                }
-                                setTimeout(function() {
-                                    if (typeof logout === 'function') logout();
-                                }, 2000);
+                            var article = document.querySelector('article');
+                            if (article) {
+                                article.innerHTML = 
+                                    '<h2>Success!</h2>' +
+                                    '<p>' + message + '</p>' +
+                                    '<p>Returning to login screen...</p>';
                             }
+                            setTimeout(function() {
+                                if (typeof logout === 'function') logout();
+                            }, 2000);
                         }
                     })
                     .withFailureHandler(function(error) {
@@ -331,6 +255,137 @@
             
             // Initialize
             loadCheckinData();
+            
+            // EPJ Swap Modal Functions
+            window.openEpjSwapModal = function() {
+                document.getElementById('swapFeedback').textContent = '';
+                document.getElementById('swapIssueReport').value = '';
+                
+                // Load available EPJs
+                var epjSelect = document.getElementById('swapNewEpj');
+                epjSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+                
+                google.script.run
+                    .withSuccessHandler(function(data) {
+                        epjSelect.innerHTML = '<option value="" disabled selected>Select new EPJ...</option>';
+                        if (data && data.availableEpjs && data.availableEpjs.length > 0) {
+                            data.availableEpjs.forEach(function(item) {
+                                var opt = document.createElement('option');
+                                opt.value = item.epj;
+                                opt.textContent = item.epj + (item.storeOnly ? ' [Store Only]' : '');
+                                epjSelect.appendChild(opt);
+                            });
+                        } else {
+                            epjSelect.innerHTML = '<option value="" disabled selected>No EPJs available</option>';
+                        }
+                        
+                        // Also populate the zone dropdown
+                        var zoneSelect = document.getElementById('swapCurrentLocation');
+                        if (data && data.zoneOptions) {
+                            zoneSelect.innerHTML = data.zoneOptions;
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        epjSelect.innerHTML = '<option value="" disabled selected>Error loading EPJs</option>';
+                    })
+                    .getCheckoutFormData({token: _token});
+                
+                document.getElementById('epjSwapModal').classList.add('active');
+            };
+            
+            window.closeEpjSwapModal = function() {
+                document.getElementById('epjSwapModal').classList.remove('active');
+            };
+            
+            window.confirmEpjSwap = function() {
+                var newEpj = document.getElementById('swapNewEpj').value;
+                var currentLocation = document.getElementById('swapCurrentLocation').value;
+                var issueReport = document.getElementById('swapIssueReport').value;
+                var feedback = document.getElementById('swapFeedback');
+                var btn = document.getElementById('swapConfirmBtn');
+                
+                if (!newEpj) {
+                    feedback.textContent = 'Please select a new EPJ.';
+                    feedback.style.color = 'red';
+                    return;
+                }
+                
+                if (!currentLocation) {
+                    feedback.textContent = 'Please select where your current EPJ is located.';
+                    feedback.style.color = 'red';
+                    return;
+                }
+                
+                // Show loading state
+                btn.classList.add('btn-loading');
+                btn.disabled = true;
+                feedback.textContent = 'Processing swap...';
+                feedback.style.color = '';
+                
+                google.script.run
+                    .withSuccessHandler(function(message) {
+                        btn.classList.remove('btn-loading');
+                        btn.disabled = false;
+                        
+                        if (message && message.indexOf('Error') !== -1) {
+                            feedback.textContent = message;
+                            feedback.style.color = 'red';
+                        } else {
+                            feedback.textContent = message;
+                            feedback.style.color = 'green';
+                            
+                            // Reload the page to show new EPJ info
+                            setTimeout(function() {
+                                closeEpjSwapModal();
+                                // Use the parent's goBackToUserView function to properly reload
+                                if (typeof goBackToUserView === 'function') {
+                                    goBackToUserView();
+                                } else {
+                                    // Fallback: reload using getUserView through loadView
+                                    google.script.run
+                                        .withSuccessHandler(function(html) {
+                                            if (typeof loadView === 'function') {
+                                                loadView(html);
+                                            } else {
+                                                // Last resort: update content div directly
+                                                var contentDiv = document.getElementById('content');
+                                                if (contentDiv) {
+                                                    contentDiv.innerHTML = html;
+                                                    // Re-execute scripts
+                                                    var scripts = contentDiv.getElementsByTagName('script');
+                                                    for (var i = 0; i < scripts.length; i++) {
+                                                        var script = document.createElement('script');
+                                                        script.type = 'text/javascript';
+                                                        if (scripts[i].innerText) {
+                                                            script.innerText = scripts[i].innerText;
+                                                        }
+                                                        document.body.appendChild(script).parentNode.removeChild(script);
+                                                    }
+                                                }
+                                            }
+                                        })
+                                        .withFailureHandler(function() {
+                                            alert('EPJ swapped successfully! Please log in again to continue.');
+                                            if (typeof logout === 'function') logout();
+                                        })
+                                        .getUserView(_token);
+                                }
+                            }, 1500);
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        btn.classList.remove('btn-loading');
+                        btn.disabled = false;
+                        feedback.textContent = 'Error: ' + (err.message || 'Unknown error');
+                        feedback.style.color = 'red';
+                    })
+                    .driverSwapEpj({
+                        token: _token,
+                        newEpj: newEpj,
+                        currentLocation: currentLocation,
+                        issueReport: issueReport
+                    });
+            };
         })();
     </script>
 </body>
