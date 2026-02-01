@@ -29,6 +29,7 @@ const USER_SHEET_NAME = 'Users';
 const MAINT_LOG_SHEET_NAME = 'Maintenance_Log';
 const ZONES_SHEET_NAME = 'Zones';
 const LOGIN_LOG_SHEET_NAME = 'Login_Log';
+const ANNOUNCEMENTS_SHEET_NAME = 'Announcements';
 
 // --- PASTE YOUR WAREHOUSE COORDINATES HERE ---
 const WAREHOUSE_LAT = 39.58390517747175;
@@ -143,6 +144,13 @@ function getUserView(token) {
         Logger.log('Warning: activeTrip missing epj property: ' + JSON.stringify(activeTrip));
         activeTrip.epj = 'Unknown';
       }
+      
+      // Check if this is an Overspill or Pre-Load trip (no real EPJ)
+      const isOverspillTrip = activeTrip.epj === 'N/A - Overspill' || 
+                              activeTrip.epj === 'N/A - Pre-Load' || 
+                              activeTrip.epj === 'N/A - None Required' ||
+                              (activeTrip.epj && activeTrip.epj.startsWith('N/A'));
+      
       try {
         const template = HtmlService.createTemplateFromFile('CheckInForm');
         template.username = session.username;
@@ -150,8 +158,12 @@ function getUserView(token) {
         template.currentEpj = activeTrip.epj || 'Unknown';
         template.tripId = activeTrip.tripId || '';
         template.token = token;
-        template.zoneOptions = ''; // Provide empty default for backward compatibility
-        // Don't load zone options here - let client fetch asynchronously
+        // Preload zone options here to avoid async issues
+        template.zoneOptions = getZoneOptions();
+        template.isOverspill = isOverspillTrip;
+        template.currentTruck = activeTrip.truck || '';
+        template.currentTrailer = activeTrip.trailer || '';
+        template.currentRoute = activeTrip.route || '';
         return template.evaluate().getContent();
       } catch (e) {
         Logger.log('CheckInForm template error: ' + e.message + ' | activeTrip: ' + JSON.stringify(activeTrip));
@@ -287,10 +299,12 @@ function processCheckOut(data) {
     if (!session) throw new Error("Invalid session.");
     
     const isOverspill = data.isOverspill === true;
+    const isPreload = data.isPreload === true;
+    const isNaEpj = data.epjNumber === 'N/A - None Required';
     let startingZone = 'Overspill';
     
-    // Only validate EPJ if not overspill
-    if (!isOverspill) {
+    // Only validate EPJ if not overspill and not N/A
+    if (!isOverspill && !isNaEpj && data.epjNumber) {
       let availableEpjs = getEpjsByStatus('Available');
       Logger.log('Available EPJs: ' + JSON.stringify(availableEpjs));
       Logger.log('Requested EPJ: ' + data.epjNumber);
@@ -306,21 +320,44 @@ function processCheckOut(data) {
     }
     
     const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-    const tripId = (isOverspill ? "OS-" : "TRIP-") + Utilities.getUuid().substring(0, 8).toUpperCase();
-    const epjValue = isOverspill ? 'N/A - Overspill' : data.epjNumber;
     
+    // Determine trip ID prefix and EPJ value
+    let tripIdPrefix = "TRIP-";
+    let epjValue = data.epjNumber;
+    
+    if (isOverspill) {
+      tripIdPrefix = "OS-";
+      epjValue = 'N/A - Overspill';
+      startingZone = 'Overspill';
+    } else if (isPreload) {
+      tripIdPrefix = "PRE-";
+      if (isNaEpj || !data.epjNumber) {
+        epjValue = 'N/A - Pre-Load';
+        startingZone = 'Pre-Load';
+      }
+    }
+    
+    const tripId = tripIdPrefix + Utilities.getUuid().substring(0, 8).toUpperCase();
+    
+    // Log the checkout - Pre-Load trips stay active until admin checks them in from dashboard
     logSheet.appendRow([tripId, new Date(), session.username, data.driverName, data.truckNumber, data.trailerNumber, epjValue, data.route, startingZone, "Check-Out", data.faultReport, "", ""]);
     SpreadsheetApp.flush();
     
-    // Only update EPJ statuses if not overspill
-    if (!isOverspill) {
+    // Only update EPJ statuses if a real EPJ was checked out
+    if (!isOverspill && !isNaEpj && data.epjNumber) {
       updateAllEpjStatuses();
       CacheService.getScriptCache().remove('epjStatuses');
       Logger.log('Check-Out successful for EPJ: ' + data.epjNumber);
       return `Successfully checked out EPJ ${data.epjNumber}.`;
-    } else {
+    } else if (isOverspill) {
       Logger.log('Overspill Check-Out successful');
       return `Successfully checked out for Overspill (no EPJ assigned).`;
+    } else if (isPreload && (isNaEpj || !data.epjNumber)) {
+      Logger.log('Pre-Load Check-Out successful (no EPJ)');
+      return `Successfully checked out for Pre-Load (no EPJ assigned).`;
+    } else {
+      Logger.log('Pre-Load Check-Out successful with EPJ');
+      return `Successfully checked out${data.epjNumber ? ' EPJ ' + data.epjNumber : ''}.`;
     }
   } finally {
     lock.releaseLock();
@@ -407,6 +444,84 @@ function driverSwapEpj(data) {
     clearEpjCache();
     
     return `Success! Swapped to EPJ ${data.newEpj}. Your old EPJ ${activeTrip.epj} has been checked in.`;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Allow an Overspill driver to get an EPJ and optionally update their trip info
+ */
+function overspillGetEpj(data) {
+  const session = getSession(data.token);
+  if (!session) throw new Error("Invalid session.");
+  
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  
+  try {
+    // Find the driver's active overspill trip
+    const activeTrip = findActiveTrip(session.username);
+    if (!activeTrip) {
+      return "Error: No active trip found for your account.";
+    }
+    
+    // Verify this is an overspill/pre-load trip
+    const isOverspillTrip = activeTrip.epj === 'N/A - Overspill' || 
+                            activeTrip.epj === 'N/A - Pre-Load' || 
+                            activeTrip.epj === 'N/A - None Required' ||
+                            (activeTrip.epj && activeTrip.epj.startsWith('N/A'));
+    
+    if (!isOverspillTrip) {
+      return "Error: You already have an EPJ checked out. Use the swap function instead.";
+    }
+    
+    if (!data.epjNumber) {
+      return "Error: Please select an EPJ.";
+    }
+    
+    // Verify the EPJ is available
+    CacheService.getScriptCache().remove('epjStatuses');
+    let availableEpjs = getEpjsByStatus('Available').map(String);
+    if (!availableEpjs.includes(String(data.epjNumber))) {
+      return `Error: EPJ ${data.epjNumber} is no longer available.`;
+    }
+    
+    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    const now = new Date();
+    
+    // Step 1: Check in the overspill trip
+    logSheet.appendRow([
+      activeTrip.tripId, now, session.username, activeTrip.driver, "", "",
+      activeTrip.epj, "", "Overspill", "Check-In", "", 
+      "Overspill - Getting EPJ",
+      `Overspill trip ended - driver getting EPJ ${data.epjNumber}`
+    ]);
+    
+    // Step 2: Create new checkout with the EPJ
+    const newTripId = "TRIP-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+    const epjInfoMap = getEpjInfoMap();
+    const epjZone = epjInfoMap[data.epjNumber] ? epjInfoMap[data.epjNumber].location : 'Unknown';
+    
+    // Use updated trip info if provided, otherwise keep original
+    const truckNumber = data.truckNumber || activeTrip.truck || '';
+    const trailerNumber = data.trailerNumber || activeTrip.trailer || '';
+    const route = data.route || activeTrip.route || '';
+    
+    logSheet.appendRow([
+      newTripId, now, session.username, activeTrip.driver, 
+      truckNumber, trailerNumber,
+      data.epjNumber, route, epjZone, "Check-Out", 
+      `Overspill driver picked up EPJ`, '', ''
+    ]);
+    
+    SpreadsheetApp.flush();
+    updateAllEpjStatuses();
+    // Clear caches
+    clearTripCache();
+    clearEpjCache();
+    
+    return `Success! You now have EPJ ${data.epjNumber}. Drive safe!`;
   } finally {
     lock.releaseLock();
   }
@@ -596,14 +711,16 @@ function adminForceCheckIn(data) {
   if (originalTrip) {
     const originalDriver = originalTrip[3];
     const originalZone = originalTrip[8];
+    const checkInLocation = data.location || 'Admin Override';
     logSheet.appendRow([
         data.tripId, new Date(), session.username, originalDriver, "", "",
-        data.epj, "", originalZone, "Check-In", "", "Admin Override",
+        data.epj, "", originalZone, "Check-In", "", checkInLocation,
         `Forced check-in by admin ${session.username}`
     ]);
   updateAllEpjStatuses();
   CacheService.getScriptCache().remove('epjStatuses');
-  return `Successfully checked in EPJ ${data.epj}.`;
+  clearTripCache();
+  return `Successfully checked in EPJ ${data.epj} at ${checkInLocation}.`;
   }
   return `Error: Could not find original trip ID ${data.tripId}.`;
 }
@@ -888,23 +1005,47 @@ function getCheckoutFormData(data) {
 }
 
 function getCheckinFormData(data) {
-  const session = getSession(data.token);
-  if (!session) throw new Error("Invalid session.");
-  
-  // Check if the current EPJ is store-only
-  let currentEpjIsStoreOnly = false;
-  if (data.epj) {
-    const allStatuses = getEpjsByStatus(null, true);
-    const epjData = allStatuses.find(item => item.epj === data.epj);
-    if (epjData) {
-      currentEpjIsStoreOnly = epjData.storeOnly || false;
+  try {
+    const session = getSession(data.token);
+    if (!session) throw new Error("Invalid session.");
+    
+    // Get zone options first (this is fast due to caching)
+    const zoneOptions = getZoneOptions();
+    
+    // Return early with just zones if no EPJ to check
+    if (!data.epj || data.epj.startsWith('N/A')) {
+      return {
+        zoneOptions: zoneOptions,
+        currentEpjIsStoreOnly: false
+      };
     }
+    
+    // Check if the current EPJ is store-only - use cached data only to avoid slowness
+    let currentEpjIsStoreOnly = false;
+    try {
+      const cache = CacheService.getScriptCache();
+      const cachedStatuses = cache.get('epjStatuses');
+      
+      if (cachedStatuses) {
+        const allStatuses = JSON.parse(cachedStatuses);
+        const epjData = allStatuses.find(item => item.epj === data.epj);
+        if (epjData) {
+          currentEpjIsStoreOnly = epjData.storeOnly || false;
+        }
+      }
+      // Skip direct sheet lookup - it's too slow and store-only is not critical
+    } catch (e) {
+      Logger.log('Error checking EPJ store-only status: ' + e.message);
+    }
+    
+    return {
+      zoneOptions: zoneOptions,
+      currentEpjIsStoreOnly: currentEpjIsStoreOnly
+    };
+  } catch (e) {
+    Logger.log('Error in getCheckinFormData: ' + e.message);
+    throw e;
   }
-  
-  return {
-    zoneOptions: getZoneOptions(),
-    currentEpjIsStoreOnly: currentEpjIsStoreOnly
-  };
 }
 
 function getLoadSupportData(data) {
@@ -1130,13 +1271,70 @@ function getActiveCheckoutsForAdmin(data) {
         cache.remove('activeTrips');
     }
     
+    // Get EPJ store-only status map
+    const epjStatuses = getEpjsByStatus(null, true);
+    const storeOnlyMap = {};
+    epjStatuses.forEach(item => { storeOnlyMap[item.epj] = item.storeOnly || false; });
+    
+    // Auto-expire Overspill and Pre-Load trips older than 1 hour
+    autoExpireNonEpjTrips();
+    
     const activeCheckouts = getActiveCheckouts().map(checkout => {
         const driverInfo = userMap[checkout.driverUsername];
         checkout.carrier = driverInfo ? driverInfo.carrier : 'N/A';
+        checkout.storeOnly = storeOnlyMap[checkout.epj] || false;
         return checkout;
     });
     
     return activeCheckouts;
+}
+
+/**
+ * Auto-expire Overspill and Pre-Load trips after 1 hour
+ * These are morning drivers who don't take an EPJ
+ */
+function autoExpireNonEpjTrips() {
+    const oneHourMs = 60 * 60 * 1000; // 1 hour in milliseconds
+    const now = Date.now();
+    
+    const activeCheckouts = getActiveCheckouts();
+    const tripsToExpire = activeCheckouts.filter(trip => {
+        // Only auto-expire Overspill and Pre-Load trips
+        const isOverspill = trip.epj === 'N/A - Overspill';
+        const isPreload = trip.epj === 'N/A - Pre-Load';
+        if (!isOverspill && !isPreload) return false;
+        
+        // Check if older than 1 hour
+        const tripAge = now - (trip.timestampMs || 0);
+        return tripAge > oneHourMs;
+    });
+    
+    if (tripsToExpire.length === 0) return;
+    
+    const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+    if (!logSheet) return;
+    
+    tripsToExpire.forEach(trip => {
+        const tripType = trip.epj === 'N/A - Overspill' ? 'Overspill' : 'Pre-Load';
+        logSheet.appendRow([
+            trip.tripId,
+            new Date(),
+            'SYSTEM',
+            trip.driver,
+            '',
+            '',
+            trip.epj,
+            '',
+            trip.zone || '',
+            'Check-In',
+            '',
+            'Auto-Expired',
+            `${tripType} trip auto-expired after 1 hour`
+        ]);
+    });
+    
+    // Clear cache to reflect changes
+    clearTripCache();
 }
 
 function findActiveTrip(username) {
@@ -1160,16 +1358,51 @@ function getActiveDriverNames() {
 }
 
 function getZoneOptions() {
-    const cache = CacheService.getScriptCache();
-    const cached = cache.get('zoneOptions');
-    if (cached != null) { return cached; }
+    try {
+        const cache = CacheService.getScriptCache();
+        const cached = cache.get('zoneOptions');
+        if (cached != null && cached !== '') { return cached; }
+        
+        const zoneSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ZONES_SHEET_NAME);
+        if (!zoneSheet) {
+            Logger.log('Zones sheet not found: ' + ZONES_SHEET_NAME);
+            return '<option value="Unknown">Unknown Location</option>';
+        }
+        
+        const lastRow = zoneSheet.getLastRow();
+        if (lastRow < 1) {
+            Logger.log('Zones sheet is empty');
+            return '<option value="Unknown">Unknown Location</option>';
+        }
+        
+        const zones = zoneSheet.getRange(1, 1, lastRow, 1).getValues().flat().filter(String);
+        if (zones.length === 0) {
+            Logger.log('No zones found in sheet');
+            return '<option value="Unknown">Unknown Location</option>';
+        }
+        
+        let options = '';
+        zones.forEach(zone => { options += `<option value="${zone}">${zone}</option>`; });
+        cache.put('zoneOptions', options, 21600);
+        return options;
+    } catch (e) {
+        Logger.log('Error in getZoneOptions: ' + e.message);
+        return '<option value="Unknown">Unknown Location</option>';
+    }
+}
+
+/**
+ * Get list of zones as an array (for dropdowns)
+ */
+function getZonesList(data) {
+    const session = getSession(data.token);
+    if (!session) throw new Error('Invalid session.');
+    
     const zoneSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ZONES_SHEET_NAME);
-    if (!zoneSheet) return "";
+    if (!zoneSheet) return [];
+    
     const zones = zoneSheet.getRange("A1:A").getValues().flat().filter(String);
-    let options = '';
-    zones.forEach(zone => { options += `<option value="${zone}">${zone}</option>`; });
-    cache.put('zoneOptions', options, 21600);
-    return options;
+    return zones;
 }
 
 function getEpjsByStatus(status, all = false) {
@@ -1430,5 +1663,426 @@ function sha256(input) {
     hash += (hex.length == 1 ? '0' : '') + hex;
   }
   return hash;
+}
+
+// ==================== ANNOUNCEMENTS ====================
+
+/**
+ * Get or create the Announcements sheet
+ */
+function getAnnouncementsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ANNOUNCEMENTS_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(ANNOUNCEMENTS_SHEET_NAME);
+    sheet.appendRow(['ID', 'Created', 'CreatedBy', 'Message', 'Priority', 'ExpiresAt', 'Active']);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/**
+ * Create a new announcement (Admin only)
+ */
+function adminCreateAnnouncement(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const message = (data.message || '').trim();
+  if (!message) throw new Error('Message is required.');
+  
+  const sheet = getAnnouncementsSheet();
+  const id = 'ANN-' + Utilities.getUuid().substring(0, 8).toUpperCase();
+  const priority = data.priority || 'normal'; // normal, important, urgent
+  
+  // Calculate expiration (default 24 hours, or custom)
+  let expiresAt = null;
+  if (data.expiresInHours && data.expiresInHours > 0) {
+    expiresAt = new Date(Date.now() + (data.expiresInHours * 60 * 60 * 1000));
+  } else {
+    expiresAt = new Date(Date.now() + (24 * 60 * 60 * 1000)); // Default 24 hours
+  }
+  
+  sheet.appendRow([id, new Date(), session.username, message, priority, expiresAt, true]);
+  
+  return { success: true, id: id, message: 'Announcement created successfully.' };
+}
+
+/**
+ * Get active announcements (for drivers and admins)
+ */
+function getActiveAnnouncements(data) {
+  const session = getSession(data.token);
+  if (!session) throw new Error('Invalid session.');
+  
+  const sheet = getAnnouncementsSheet();
+  if (sheet.getLastRow() < 2) return [];
+  
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+  const now = new Date();
+  const announcements = [];
+  
+  rows.forEach(row => {
+    const isActive = row[6] === true || row[6] === 'TRUE';
+    const expiresAt = row[5] ? new Date(row[5]) : null;
+    const isExpired = expiresAt && expiresAt < now;
+    
+    if (isActive && !isExpired) {
+      announcements.push({
+        id: row[0],
+        created: new Date(row[1]).toLocaleString(),
+        createdBy: row[2],
+        message: row[3],
+        priority: row[4] || 'normal',
+        expiresAt: expiresAt ? expiresAt.toLocaleString() : null
+      });
+    }
+  });
+  
+  // Sort by priority (urgent first) then by date (newest first)
+  const priorityOrder = { urgent: 0, important: 1, normal: 2 };
+  return announcements.sort((a, b) => {
+    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    }
+    return new Date(b.created) - new Date(a.created);
+  });
+}
+
+/**
+ * Delete/deactivate an announcement (Admin only)
+ */
+function adminDeleteAnnouncement(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const sheet = getAnnouncementsSheet();
+  if (sheet.getLastRow() < 2) return 'Announcement not found.';
+  
+  const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().flat();
+  
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i] === data.announcementId) {
+      // Set Active to false instead of deleting
+      sheet.getRange(i + 2, 7).setValue(false);
+      return 'Announcement deleted successfully.';
+    }
+  }
+  
+  return 'Announcement not found.';
+}
+
+/**
+ * Get all announcements for admin management
+ */
+function adminGetAllAnnouncements(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const sheet = getAnnouncementsSheet();
+  if (sheet.getLastRow() < 2) return [];
+  
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+  const now = new Date();
+  
+  return rows.map(row => {
+    const expiresAt = row[5] ? new Date(row[5]) : null;
+    return {
+      id: row[0],
+      created: new Date(row[1]).toLocaleString(),
+      createdBy: row[2],
+      message: row[3],
+      priority: row[4] || 'normal',
+      expiresAt: expiresAt ? expiresAt.toLocaleString() : null,
+      active: row[6] === true || row[6] === 'TRUE',
+      expired: expiresAt && expiresAt < now
+    };
+  }).reverse(); // Newest first
+}
+
+// ==================== REPORTING ====================
+
+/**
+ * Get checkout history with optional date filtering
+ */
+function getCheckoutHistory(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet || logSheet.getLastRow() < 2) return { checkouts: [], checkins: [] };
+  
+  const startDate = data.startDate ? new Date(data.startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Default: last 7 days
+  const endDate = data.endDate ? new Date(data.endDate) : new Date();
+  endDate.setHours(23, 59, 59, 999); // Include full end day
+  
+  const rows = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 13).getValues();
+  const checkouts = [];
+  const checkins = [];
+  
+  rows.forEach(row => {
+    const timestamp = new Date(row[1]);
+    if (timestamp < startDate || timestamp > endDate) return;
+    
+    const status = String(row[9] || '').trim();
+    const entry = {
+      tripId: row[0],
+      timestamp: timestamp.toLocaleString(),
+      timestampMs: timestamp.getTime(),
+      username: row[2],
+      driver: row[3],
+      truck: row[4],
+      trailer: row[5],
+      epj: row[6],
+      route: row[7],
+      zone: row[8],
+      status: status,
+      notes: row[10],
+      location: row[11]
+    };
+    
+    if (status === 'Check-Out') {
+      checkouts.push(entry);
+    } else if (status === 'Check-In') {
+      checkins.push(entry);
+    }
+  });
+  
+  return {
+    checkouts: checkouts.sort((a, b) => b.timestampMs - a.timestampMs),
+    checkins: checkins.sort((a, b) => b.timestampMs - a.timestampMs),
+    dateRange: { start: startDate.toLocaleDateString(), end: endDate.toLocaleDateString() }
+  };
+}
+
+/**
+ * Get peak hours analysis (checkouts by hour of day)
+ */
+function getPeakHoursAnalysis(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet || logSheet.getLastRow() < 2) return { hourly: [], daily: [] };
+  
+  const daysBack = data.daysBack || 30;
+  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  
+  const rows = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 10).getValues();
+  
+  // Initialize counters
+  const hourlyCheckouts = Array(24).fill(0);
+  const dailyCheckouts = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let totalCheckouts = 0;
+  
+  rows.forEach(row => {
+    const timestamp = new Date(row[1]);
+    const status = String(row[9] || '').trim();
+    
+    if (status === 'Check-Out' && timestamp >= cutoff) {
+      hourlyCheckouts[timestamp.getHours()]++;
+      dailyCheckouts[dayNames[timestamp.getDay()]]++;
+      totalCheckouts++;
+    }
+  });
+  
+  // Find peak hour
+  let peakHour = 0;
+  let peakCount = 0;
+  hourlyCheckouts.forEach((count, hour) => {
+    if (count > peakCount) {
+      peakCount = count;
+      peakHour = hour;
+    }
+  });
+  
+  return {
+    hourly: hourlyCheckouts.map((count, hour) => ({
+      hour: hour,
+      label: `${hour.toString().padStart(2, '0')}:00`,
+      count: count
+    })),
+    daily: Object.entries(dailyCheckouts).map(([day, count]) => ({ day, count })),
+    peakHour: `${peakHour.toString().padStart(2, '0')}:00`,
+    peakHourCount: peakCount,
+    totalCheckouts: totalCheckouts,
+    daysAnalyzed: daysBack
+  };
+}
+
+/**
+ * Get EPJ downtime/maintenance report
+ */
+function getEpjDowntimeReport(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const maintSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MAINT_LOG_SHEET_NAME);
+  if (!maintSheet || maintSheet.getLastRow() < 2) return { epjStats: [], totalDowntime: 0 };
+  
+  const daysBack = data.daysBack || 30;
+  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  
+  const rows = maintSheet.getRange(2, 1, maintSheet.getLastRow() - 1, 5).getValues();
+  
+  // Track maintenance periods per EPJ
+  const epjMaintenance = {};
+  const openMaintenance = {}; // Track ongoing maintenance
+  
+  rows.forEach(row => {
+    const timestamp = new Date(row[0]);
+    if (timestamp < cutoff) return;
+    
+    const epj = String(row[1] || '').trim();
+    const eventType = String(row[2] || '').trim();
+    
+    if (!epj) return;
+    if (!epjMaintenance[epj]) {
+      epjMaintenance[epj] = { totalMinutes: 0, incidents: 0, reasons: [] };
+    }
+    
+    if (eventType === 'Maintenance Start' || eventType === 'Issue Reported') {
+      openMaintenance[epj] = timestamp;
+      epjMaintenance[epj].incidents++;
+      const reason = String(row[3] || 'Unknown').trim();
+      if (reason && !epjMaintenance[epj].reasons.includes(reason)) {
+        epjMaintenance[epj].reasons.push(reason);
+      }
+    } else if (eventType === 'Maintenance End' && openMaintenance[epj]) {
+      const duration = (timestamp - openMaintenance[epj]) / (1000 * 60); // minutes
+      epjMaintenance[epj].totalMinutes += duration;
+      delete openMaintenance[epj];
+    }
+  });
+  
+  // Add ongoing maintenance time
+  const now = new Date();
+  Object.entries(openMaintenance).forEach(([epj, startTime]) => {
+    const duration = (now - startTime) / (1000 * 60);
+    epjMaintenance[epj].totalMinutes += duration;
+  });
+  
+  // Convert to array and sort by downtime
+  const epjStats = Object.entries(epjMaintenance).map(([epj, stats]) => ({
+    epj: epj,
+    totalMinutes: Math.round(stats.totalMinutes),
+    totalHours: Math.round(stats.totalMinutes / 60 * 10) / 10,
+    incidents: stats.incidents,
+    reasons: stats.reasons.slice(0, 3), // Top 3 reasons
+    isCurrentlyDown: !!openMaintenance[epj]
+  })).sort((a, b) => b.totalMinutes - a.totalMinutes);
+  
+  const totalDowntime = epjStats.reduce((sum, s) => sum + s.totalMinutes, 0);
+  
+  return {
+    epjStats: epjStats,
+    totalDowntimeMinutes: totalDowntime,
+    totalDowntimeHours: Math.round(totalDowntime / 60 * 10) / 10,
+    daysAnalyzed: daysBack,
+    epjsWithDowntime: epjStats.filter(s => s.totalMinutes > 0).length
+  };
+}
+
+/**
+ * Get daily summary statistics
+ */
+function getDailySummary(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet || logSheet.getLastRow() < 2) return {};
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const rows = logSheet.getRange(2, 1, logSheet.getLastRow() - 1, 10).getValues();
+  
+  let todayCheckouts = 0;
+  let todayCheckins = 0;
+  const driversToday = new Set();
+  const epjsUsedToday = new Set();
+  let totalTripMinutes = 0;
+  let completedTrips = 0;
+  
+  // Track checkout times for calculating average trip duration
+  const checkoutTimes = {};
+  
+  rows.forEach(row => {
+    const timestamp = new Date(row[1]);
+    const status = String(row[9] || '').trim();
+    const tripId = row[0];
+    const driver = row[3];
+    const epj = row[6];
+    
+    if (timestamp >= today && timestamp < tomorrow) {
+      if (status === 'Check-Out') {
+        todayCheckouts++;
+        if (driver) driversToday.add(driver);
+        if (epj && !epj.startsWith('N/A')) epjsUsedToday.add(epj);
+        checkoutTimes[tripId] = timestamp;
+      } else if (status === 'Check-In') {
+        todayCheckins++;
+        if (checkoutTimes[tripId]) {
+          const duration = (timestamp - checkoutTimes[tripId]) / (1000 * 60);
+          totalTripMinutes += duration;
+          completedTrips++;
+        }
+      }
+    }
+  });
+  
+  const avgTripMinutes = completedTrips > 0 ? Math.round(totalTripMinutes / completedTrips) : 0;
+  
+  return {
+    date: today.toLocaleDateString(),
+    checkouts: todayCheckouts,
+    checkins: todayCheckins,
+    activeTrips: todayCheckouts - todayCheckins,
+    uniqueDrivers: driversToday.size,
+    uniqueEpjs: epjsUsedToday.size,
+    avgTripMinutes: avgTripMinutes,
+    avgTripFormatted: avgTripMinutes > 60 
+      ? `${Math.floor(avgTripMinutes / 60)}h ${avgTripMinutes % 60}m`
+      : `${avgTripMinutes}m`
+  };
+}
+
+/**
+ * Export checkout data as CSV (returns CSV string)
+ */
+function exportCheckoutDataCsv(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  
+  const history = getCheckoutHistory(data);
+  
+  // Combine and sort all entries
+  const allEntries = [...history.checkouts, ...history.checkins]
+    .sort((a, b) => a.timestampMs - b.timestampMs);
+  
+  // Build CSV
+  const headers = ['Timestamp', 'Trip ID', 'Driver', 'Username', 'EPJ', 'Truck', 'Trailer', 'Route', 'Zone', 'Status', 'Location', 'Notes'];
+  const rows = allEntries.map(e => [
+    e.timestamp,
+    e.tripId,
+    e.driver,
+    e.username,
+    e.epj,
+    e.truck,
+    e.trailer,
+    e.route,
+    e.zone,
+    e.status,
+    e.location || '',
+    (e.notes || '').replace(/,/g, ';').replace(/\n/g, ' ')
+  ]);
+  
+  const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+  
+  return csv;
 }
 

@@ -241,45 +241,53 @@
             
             /* Compact table styling for Live Checkouts */
             #activeCheckoutsTable {
-                font-size: 0.9rem;
+                font-size: 0.8rem;
+                width: 100%;
             }
             #activeCheckoutsTable th,
             #activeCheckoutsTable td {
-                padding: 0.4rem 0.5rem;
+                padding: 0.25rem 0.35rem;
                 vertical-align: middle;
             }
             #activeCheckoutsTable th {
-                font-size: 0.8rem;
+                font-size: 0.7rem;
                 text-transform: uppercase;
                 letter-spacing: 0.02em;
                 background: var(--table-border-color);
             }
             #activeCheckoutsTable td button {
-                padding: 0.25rem 0.5rem;
-                font-size: 0.75rem;
-                margin: 0 0.15rem;
+                padding: 0.15rem 0.35rem;
+                font-size: 0.65rem;
+                margin: 0 0.1rem;
             }
             #activeCheckoutsTable .epj-badge {
                 display: inline-block;
                 background: var(--primary);
                 color: white;
-                padding: 0.15rem 0.4rem;
-                border-radius: 0.25rem;
+                padding: 0.1rem 0.3rem;
+                border-radius: 0.2rem;
                 font-weight: 600;
-                font-size: 0.85rem;
+                font-size: 0.75rem;
             }
             #activeCheckoutsTable .epj-badge.overspill {
                 background: #9c27b0;
             }
+            #activeCheckoutsTable .epj-badge.preload {
+                background: #00acc1;
+            }
+            #activeCheckoutsTable .epj-badge.store-only {
+                background: #f9a825;
+                color: #000;
+            }
             #activeCheckoutsTable .truck-trailer {
                 font-family: monospace;
-                font-size: 0.85rem;
+                font-size: 0.75rem;
             }
             #activeCheckoutsTable .checkout-type {
                 display: inline-block;
-                padding: 0.1rem 0.35rem;
-                border-radius: 0.2rem;
-                font-size: 0.7rem;
+                padding: 0.05rem 0.25rem;
+                border-radius: 0.15rem;
+                font-size: 0.6rem;
                 font-weight: 600;
                 text-transform: uppercase;
             }
@@ -292,8 +300,8 @@
                 color: #e65100;
             }
             #activeCheckoutsTable .worked-checkbox {
-                width: 1.1rem !important;
-                height: 1.1rem !important;
+                width: 0.9rem !important;
+                height: 0.9rem !important;
                 cursor: pointer;
                 margin: 0 auto;
                 display: block;
@@ -474,6 +482,214 @@
                 font-size: 0.85rem;
             }
             
+            /* Column toggle checkboxes */
+            .column-toggles {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .column-toggle {
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+                padding: 0.35rem 0.6rem;
+                background: var(--table-border-color);
+                border-radius: 0.25rem;
+                font-size: 0.8rem;
+                cursor: pointer;
+                user-select: none;
+                transition: background 0.2s;
+            }
+            .column-toggle:hover {
+                background: var(--primary-focus);
+            }
+            .column-toggle input {
+                width: 1rem !important;
+                height: 1rem !important;
+            }
+            
+            /* Table density classes */
+            table.density-compact th,
+            table.density-compact td {
+                padding: 0.25rem 0.4rem !important;
+                font-size: 0.8rem !important;
+            }
+            table.density-comfortable th,
+            table.density-comfortable td {
+                padding: 0.5rem 0.6rem !important;
+                font-size: 0.9rem !important;
+            }
+            table.density-spacious th,
+            table.density-spacious td {
+                padding: 0.75rem 0.8rem !important;
+                font-size: 0.95rem !important;
+            }
+            
+            /* Hidden columns */
+            .col-hidden { display: none !important; }
+            
+            /* Announcement styles */
+            .announcement-card {
+                background: var(--card-background-color);
+                border: 1px solid var(--muted-border-color);
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin-bottom: 0.75rem;
+                position: relative;
+            }
+            .announcement-card.priority-important {
+                border-left: 4px solid #ff9800;
+                background: rgba(255, 152, 0, 0.05);
+            }
+            .announcement-card.priority-urgent {
+                border-left: 4px solid #f44336;
+                background: rgba(244, 67, 54, 0.08);
+            }
+            .announcement-card .announcement-meta {
+                font-size: 0.75rem;
+                color: var(--muted-color);
+                margin-bottom: 0.5rem;
+                display: flex;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+            }
+            .announcement-card .announcement-message {
+                font-size: 0.95rem;
+                margin-bottom: 0.75rem;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+            .announcement-card .delete-btn {
+                position: absolute;
+                top: 0.5rem;
+                right: 0.5rem;
+                background: none;
+                border: none;
+                color: var(--muted-color);
+                cursor: pointer;
+                padding: 0.25rem;
+                font-size: 1rem;
+                line-height: 1;
+            }
+            .announcement-card .delete-btn:hover {
+                color: #f44336;
+            }
+            .announcement-badge {
+                display: inline-block;
+                padding: 0.15rem 0.4rem;
+                border-radius: 0.2rem;
+                font-size: 0.7rem;
+                font-weight: 600;
+                text-transform: uppercase;
+            }
+            .announcement-badge.priority-normal { background: #e3f2fd; color: #1565c0; }
+            .announcement-badge.priority-important { background: #fff3e0; color: #e65100; }
+            .announcement-badge.priority-urgent { background: #ffebee; color: #c62828; }
+            
+            /* Report stats */
+            .stat-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+            .stat-card {
+                background: var(--table-border-color);
+                border-radius: 0.5rem;
+                padding: 0.75rem;
+                text-align: center;
+            }
+            .stat-card .stat-value {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: var(--primary);
+            }
+            .stat-card .stat-label {
+                font-size: 0.75rem;
+                color: var(--muted-color);
+                text-transform: uppercase;
+            }
+            
+            /* Peak hours chart */
+            .hour-bar-container {
+                display: flex;
+                align-items: flex-end;
+                height: 120px;
+                gap: 2px;
+                margin-bottom: 0.5rem;
+                padding: 0 0.25rem;
+            }
+            .hour-bar {
+                flex: 1;
+                background: var(--primary);
+                border-radius: 2px 2px 0 0;
+                min-height: 4px;
+                position: relative;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .hour-bar:hover {
+                background: var(--primary-hover);
+            }
+            .hour-bar::after {
+                content: attr(data-count);
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 0.6rem;
+                opacity: 0;
+                transition: opacity 0.2s;
+            }
+            .hour-bar:hover::after {
+                opacity: 1;
+            }
+            .hour-labels {
+                display: flex;
+                gap: 2px;
+                font-size: 0.6rem;
+                color: var(--muted-color);
+            }
+            .hour-labels span {
+                flex: 1;
+                text-align: center;
+            }
+            
+            /* Downtime list */
+            .downtime-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5rem 0;
+                border-bottom: 1px solid var(--muted-border-color);
+            }
+            .downtime-item:last-child {
+                border-bottom: none;
+            }
+            .downtime-item .epj-name {
+                font-weight: 600;
+            }
+            .downtime-item .downtime-hours {
+                color: #f44336;
+                font-weight: 600;
+            }
+            .downtime-item.currently-down {
+                background: rgba(244, 67, 54, 0.1);
+                padding: 0.5rem;
+                border-radius: 0.25rem;
+                margin: 0.25rem 0;
+            }
+            
+            /* Force check-in location section */
+            .force-checkin-location {
+                background: #e8f5e9;
+                border: 1px solid #66bb6a;
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin: 1rem 0;
+            }
+            
             /* Mobile-friendly touch targets */
             @media (max-width: 768px) {
                 .epj-card {
@@ -515,6 +731,8 @@
                 <button class="tab-btn" data-tab="users">Users</button>
                 <button class="tab-btn" data-tab="maintenance">Maintenance</button>
                 <button class="tab-btn" data-tab="fleet">Fleet Management</button>
+                <button class="tab-btn" data-tab="announcements" data-tooltip="Broadcast messages to drivers">📢 Announcements</button>
+                <button class="tab-btn" data-tab="reports" data-tooltip="Analytics and reports">📊 Reports</button>
                 <button class="tab-btn" data-tab="settings" data-tooltip="Notification & display settings">⚙️ Settings</button>
             </nav>
             
@@ -541,7 +759,7 @@
                             </button>
                         </span>
                     </h3>
-                    <div class="overflow-auto">
+                    <div class="overflow-auto" style="display:flex; justify-content:center;">
                         <table id="activeCheckoutsTable">
                             <thead><tr><th>Driver</th><th>Carrier</th><th>EPJ</th><th>Type</th><th>Truck</th><th>Trailer</th><th>Route</th><th>Time</th><th>Worked</th><th>Actions</th></tr></thead>
                             <tbody></tbody>
@@ -635,6 +853,121 @@
                 </article>
             </div>
 
+            <!-- Tab: Announcements -->
+            <div id="tab-announcements" class="tab-content">
+                <article>
+                    <h3 style="text-align:center;">📢 Driver Announcements</h3>
+                    <p style="text-align:center; color:var(--muted-color); font-size:0.9rem;">
+                        Create announcements that all drivers will see when they log in or on the checkout form.
+                    </p>
+                    
+                    <div class="grid">
+                        <div>
+                            <h4>Create New Announcement</h4>
+                            <label for="announcementMessage">Message</label>
+                            <textarea id="announcementMessage" placeholder="Enter your announcement message..." rows="3"></textarea>
+                            
+                            <label for="announcementPriority">Priority</label>
+                            <select id="announcementPriority">
+                                <option value="normal">Normal</option>
+                                <option value="important">Important (highlighted)</option>
+                                <option value="urgent">Urgent (red alert)</option>
+                            </select>
+                            
+                            <label for="announcementExpiry">Auto-expire in</label>
+                            <select id="announcementExpiry">
+                                <option value="6">6 hours</option>
+                                <option value="12">12 hours</option>
+                                <option value="24" selected>24 hours</option>
+                                <option value="48">2 days</option>
+                                <option value="168">1 week</option>
+                                <option value="0">Never (manual delete)</option>
+                            </select>
+                            
+                            <button id="createAnnouncementBtn" onclick="createAnnouncement()"><span>📢 Post Announcement</span></button>
+                        </div>
+                        
+                        <div>
+                            <h4>Active Announcements</h4>
+                            <div id="announcementsList" style="max-height:400px; overflow-y:auto;">
+                                <p style="text-align:center; color:var(--muted-color);">Loading announcements...</p>
+                            </div>
+                            <button class="outline secondary" style="width:100%; margin-top:1rem;" onclick="loadAnnouncements()">
+                                <span>⟳ Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            </div>
+            
+            <!-- Tab: Reports -->
+            <div id="tab-reports" class="tab-content">
+                <article>
+                    <h3 style="text-align:center;">📊 Reports & Analytics</h3>
+                    
+                    <!-- Daily Summary Card -->
+                    <div class="notification-prefs" style="max-width:100%;">
+                        <h4>📋 Today's Summary</h4>
+                        <div id="dailySummaryContent">
+                            <p style="text-align:center; color:var(--muted-color);">Loading today's summary...</p>
+                        </div>
+                        <button class="outline secondary" style="width:100%; margin-top:0.5rem;" onclick="loadDailySummary()">
+                            <span>⟳ Refresh</span>
+                        </button>
+                    </div>
+                    
+                    <div class="grid" style="margin-top:1rem;">
+                        <!-- Peak Hours Analysis -->
+                        <div class="notification-prefs" style="max-width:100%;">
+                            <h4>⏱️ Peak Hours Analysis</h4>
+                            <label for="peakHoursDays">Time Period</label>
+                            <select id="peakHoursDays" onchange="loadPeakHours()">
+                                <option value="7">Last 7 days</option>
+                                <option value="14">Last 14 days</option>
+                                <option value="30" selected>Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                            </select>
+                            <div id="peakHoursContent" style="margin-top:1rem;">
+                                <p style="text-align:center; color:var(--muted-color);">Loading peak hours data...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- EPJ Downtime Report -->
+                        <div class="notification-prefs" style="max-width:100%;">
+                            <h4>🔧 EPJ Downtime Report</h4>
+                            <label for="downtimeDays">Time Period</label>
+                            <select id="downtimeDays" onchange="loadDowntimeReport()">
+                                <option value="7">Last 7 days</option>
+                                <option value="14">Last 14 days</option>
+                                <option value="30" selected>Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                            </select>
+                            <div id="downtimeContent" style="margin-top:1rem;">
+                                <p style="text-align:center; color:var(--muted-color);">Loading downtime data...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Export Section -->
+                    <div class="notification-prefs" style="max-width:100%; margin-top:1rem;">
+                        <h4>📤 Export Checkout History</h4>
+                        <div class="grid">
+                            <div>
+                                <label for="exportStartDate">Start Date</label>
+                                <input type="date" id="exportStartDate">
+                            </div>
+                            <div>
+                                <label for="exportEndDate">End Date</label>
+                                <input type="date" id="exportEndDate">
+                            </div>
+                        </div>
+                        <button onclick="exportCheckoutHistory()" style="width:100%; margin-top:1rem;">
+                            <span>📥 Download CSV Export</span>
+                        </button>
+                    </div>
+                </article>
+            </div>
+
             <p id="feedback" style="text-align:center; min-height: 20px;"></p>
         </main>
 
@@ -649,8 +982,9 @@
                 <article>
                     <h3 style="text-align:center;">⚙️ Dashboard Settings</h3>
                     
+                    <!-- Sound Settings -->
                     <div class="notification-prefs">
-                        <h4>🔔 Notification Preferences</h4>
+                        <h4>🔔 Sound & Notification Settings</h4>
                         <div class="pref-row">
                             <label for="prefSoundEnabled">Enable notification sounds</label>
                             <input type="checkbox" id="prefSoundEnabled" checked role="switch">
@@ -658,45 +992,110 @@
                         <div class="pref-row">
                             <label for="prefFreshLoginSound">New checkout sound</label>
                             <select id="prefFreshLoginSound">
-                                <option value="chime">Chime (ascending)</option>
-                                <option value="ding">Ding</option>
-                                <option value="bell">Bell</option>
-                                <option value="pop">Pop</option>
-                                <option value="success">Success</option>
-                                <option value="ping">Ping</option>
-                                <option value="none">None</option>
+                                <optgroup label="Melodic">
+                                    <option value="chime">Chime (ascending)</option>
+                                    <option value="ding">Ding</option>
+                                    <option value="bell">Bell</option>
+                                    <option value="success">Success fanfare</option>
+                                    <option value="harp">Harp gliss</option>
+                                    <option value="marimba">Marimba</option>
+                                </optgroup>
+                                <optgroup label="Short">
+                                    <option value="pop">Pop</option>
+                                    <option value="ping">Ping</option>
+                                    <option value="blip">Blip</option>
+                                    <option value="click">Click</option>
+                                    <option value="tap">Tap</option>
+                                </optgroup>
+                                <optgroup label="Attention">
+                                    <option value="horn">Air horn</option>
+                                    <option value="whistle">Whistle</option>
+                                    <option value="buzzer">Buzzer</option>
+                                </optgroup>
+                                <option value="none">None (silent)</option>
                             </select>
                         </div>
                         <div class="pref-row">
                             <label for="prefSwapSound">EPJ swap sound</label>
                             <select id="prefSwapSound">
-                                <option value="double-beep">Double beep</option>
-                                <option value="alert">Alert tone</option>
-                                <option value="warning">Warning</option>
-                                <option value="swoosh">Swoosh</option>
-                                <option value="blip">Blip-blip</option>
-                                <option value="none">None</option>
+                                <optgroup label="Alert Tones">
+                                    <option value="double-beep">Double beep</option>
+                                    <option value="alert">Alert tone</option>
+                                    <option value="warning">Warning</option>
+                                    <option value="triple-beep">Triple beep</option>
+                                    <option value="siren">Mini siren</option>
+                                </optgroup>
+                                <optgroup label="Smooth">
+                                    <option value="swoosh">Swoosh</option>
+                                    <option value="blip">Blip-blip</option>
+                                    <option value="whoosh">Whoosh</option>
+                                    <option value="slide">Slide</option>
+                                </optgroup>
+                                <option value="none">None (silent)</option>
                             </select>
                         </div>
                         <div class="pref-row">
                             <label for="prefVolume">Sound volume</label>
-                            <input type="range" id="prefVolume" min="0" max="100" value="50" style="width:120px;">
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <span style="font-size:0.8rem;">🔈</span>
+                                <input type="range" id="prefVolume" min="0" max="100" value="50" style="width:100px;">
+                                <span style="font-size:0.8rem;">🔊</span>
+                                <span id="volumeDisplay" style="font-size:0.85rem; min-width:35px;">50%</span>
+                            </div>
                         </div>
                         <div class="pref-row">
-                            <label for="prefVisualNotify">Show visual notifications</label>
+                            <label for="prefVisualNotify">Show visual toast notifications</label>
                             <input type="checkbox" id="prefVisualNotify" checked role="switch">
                         </div>
                         <div class="test-buttons">
-                            <button onclick="testNotificationSound('fresh')" class="secondary outline" data-tooltip="Test fresh login sound">🔊 Test Fresh</button>
-                            <button onclick="testNotificationSound('swap')" class="secondary outline" data-tooltip="Test swap sound">🔊 Test Swap</button>
+                            <button onclick="testNotificationSound('fresh')" class="secondary outline">🔊 Test Checkout</button>
+                            <button onclick="testNotificationSound('swap')" class="secondary outline">🔊 Test Swap</button>
                         </div>
                     </div>
                     
+                    <!-- Color Customization -->
                     <div class="notification-prefs">
-                        <h4>📊 Display Preferences</h4>
+                        <h4>🎨 Color Customization</h4>
+                        <div class="pref-row">
+                            <label for="prefColorEpjNormal">Normal EPJ badge</label>
+                            <input type="color" id="prefColorEpjNormal" value="#1976d2" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefColorEpjStore">Store-only EPJ badge</label>
+                            <input type="color" id="prefColorEpjStore" value="#f9a825" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefColorEpjOverspill">Overspill badge</label>
+                            <input type="color" id="prefColorEpjOverspill" value="#9c27b0" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefColorEpjPreload">Pre-Load badge</label>
+                            <input type="color" id="prefColorEpjPreload" value="#00acc1" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefColorTypeFresh">Fresh checkout type</label>
+                            <input type="color" id="prefColorTypeFresh" value="#1565c0" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefColorTypeSwap">Swap type</label>
+                            <input type="color" id="prefColorTypeSwap" value="#e65100" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefColorWorkedRow">Worked row highlight</label>
+                            <input type="color" id="prefColorWorkedRow" value="#4caf50" style="width:60px; height:32px; padding:0; border:none; cursor:pointer;">
+                        </div>
+                        <div style="margin-top:0.75rem;">
+                            <button onclick="resetColorDefaults()" class="secondary outline" style="font-size:0.85rem;">Reset Colors to Defaults</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Display Preferences -->
+                    <div class="notification-prefs">
+                        <h4>📊 Display & Layout</h4>
                         <div class="pref-row">
                             <label for="prefAutoRefresh">Auto-refresh interval</label>
                             <select id="prefAutoRefresh">
+                                <option value="15">15 seconds</option>
                                 <option value="30">30 seconds</option>
                                 <option value="60">1 minute</option>
                                 <option value="120" selected>2 minutes</option>
@@ -705,12 +1104,41 @@
                             </select>
                         </div>
                         <div class="pref-row">
-                            <label for="prefCompactMode">Compact table view</label>
+                            <label for="prefTableDensity">Table row density</label>
+                            <select id="prefTableDensity">
+                                <option value="compact">Compact</option>
+                                <option value="comfortable" selected>Comfortable</option>
+                                <option value="spacious">Spacious</option>
+                            </select>
+                        </div>
+                        <div class="pref-row">
+                            <label for="prefCompactMode">Compact table view (legacy)</label>
                             <input type="checkbox" id="prefCompactMode" role="switch">
+                        </div>
+                        
+                        <h5 style="margin-top:1rem; margin-bottom:0.5rem;">Live Checkouts - Visible Columns</h5>
+                        <div class="column-toggles">
+                            <label class="column-toggle"><input type="checkbox" id="prefColDriver" checked> Driver</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColCarrier" checked> Carrier</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColEpj" checked> EPJ</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColType" checked> Type</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColTruck" checked> Truck</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColTrailer" checked> Trailer</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColRoute" checked> Route</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColTime" checked> Time</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColWorked" checked> Worked</label>
+                            <label class="column-toggle"><input type="checkbox" id="prefColActions" checked> Actions</label>
                         </div>
                     </div>
                     
-                    <p style="text-align:center; color:var(--muted-color); font-size:0.85rem; margin-top:1rem;">Settings are saved to your browser and will persist between sessions.</p>
+                    <p style="text-align:center; color:var(--muted-color); font-size:0.85rem; margin-top:1rem;">
+                        Settings are saved to your browser and will persist between sessions.
+                    </p>
+                    <div style="text-align:center; margin-top:0.5rem;">
+                        <button onclick="exportSettings()" class="outline secondary" style="font-size:0.85rem; margin-right:0.5rem;">📤 Export Settings</button>
+                        <button onclick="document.getElementById('importSettingsFile').click()" class="outline secondary" style="font-size:0.85rem;">📥 Import Settings</button>
+                        <input type="file" id="importSettingsFile" accept=".json" style="display:none;" onchange="importSettings(event)">
+                    </div>
                 </article>
             </div>
 
@@ -802,6 +1230,40 @@
                 </div>
                 
                 <p id="adminCheckoutFeedback" style="text-align:center; min-height:20px; margin-top:1rem;"></p>
+            </div>
+        </div>
+
+        <!-- Force Check-In Modal -->
+        <div id="forceCheckinModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Force Check-In</h3>
+                    <button class="modal-close" onclick="closeForceCheckinModal()">&times;</button>
+                </div>
+                
+                <input type="hidden" id="forceCheckinTripId">
+                
+                <div class="current-epj-info">
+                    <strong>EPJ: <span id="forceCheckinEpj"></span></strong>
+                    <p style="margin:0.5rem 0 0 0; font-size:0.9rem;">This will check in the EPJ and make it available again.</p>
+                </div>
+                
+                <div class="force-checkin-location">
+                    <label for="forceCheckinLocation"><strong>📍 Return Location</strong></label>
+                    <select id="forceCheckinLocation" style="margin-top:0.5rem;">
+                        <option value="">Loading zones...</option>
+                    </select>
+                    <p style="font-size:0.8rem; color:var(--muted-color); margin-top:0.5rem;">
+                        Assign the location where the EPJ is currently parked.
+                    </p>
+                </div>
+                
+                <div class="grid">
+                    <button class="secondary" onclick="closeForceCheckinModal()">Cancel</button>
+                    <button id="forceCheckinConfirmBtn" onclick="confirmForceCheckin()"><span>✓ Force Check-In</span></button>
+                </div>
+                
+                <p id="forceCheckinFeedback" style="text-align:center; min-height:20px; margin-top:1rem;"></p>
             </div>
         </div>
 
@@ -998,7 +1460,37 @@
                     volume: 50,
                     visualNotify: true,
                     autoRefresh: 120,
-                    compactMode: false
+                    compactMode: false,
+                    tableDensity: 'comfortable',
+                    // Color preferences
+                    colorEpjNormal: '#1976d2',
+                    colorEpjStore: '#f9a825',
+                    colorEpjOverspill: '#9c27b0',
+                    colorEpjPreload: '#00acc1',
+                    colorTypeFresh: '#1565c0',
+                    colorTypeSwap: '#e65100',
+                    colorWorkedRow: '#4caf50',
+                    // Column visibility
+                    colDriver: true,
+                    colCarrier: true,
+                    colEpj: true,
+                    colType: true,
+                    colTruck: true,
+                    colTrailer: true,
+                    colRoute: true,
+                    colTime: true,
+                    colWorked: true,
+                    colActions: true
+                };
+                
+                var _defaultColors = {
+                    colorEpjNormal: '#1976d2',
+                    colorEpjStore: '#f9a825',
+                    colorEpjOverspill: '#9c27b0',
+                    colorEpjPreload: '#00acc1',
+                    colorTypeFresh: '#1565c0',
+                    colorTypeSwap: '#e65100',
+                    colorWorkedRow: '#4caf50'
                 };
                 
                 function loadNotificationPrefs() {
@@ -1019,21 +1511,40 @@
                 }
                 
                 function applyNotificationPrefs() {
+                    // Sound settings
                     var soundEnabled = document.getElementById('prefSoundEnabled');
                     var freshSound = document.getElementById('prefFreshLoginSound');
                     var swapSound = document.getElementById('prefSwapSound');
                     var volume = document.getElementById('prefVolume');
+                    var volumeDisplay = document.getElementById('volumeDisplay');
                     var visualNotify = document.getElementById('prefVisualNotify');
                     var autoRefresh = document.getElementById('prefAutoRefresh');
                     var compactMode = document.getElementById('prefCompactMode');
+                    var tableDensity = document.getElementById('prefTableDensity');
                     
                     if (soundEnabled) soundEnabled.checked = _notifPrefs.soundEnabled;
                     if (freshSound) freshSound.value = _notifPrefs.freshLoginSound;
                     if (swapSound) swapSound.value = _notifPrefs.swapSound;
                     if (volume) volume.value = _notifPrefs.volume;
+                    if (volumeDisplay) volumeDisplay.textContent = _notifPrefs.volume + '%';
                     if (visualNotify) visualNotify.checked = _notifPrefs.visualNotify;
                     if (autoRefresh) autoRefresh.value = String(_notifPrefs.autoRefresh);
                     if (compactMode) compactMode.checked = _notifPrefs.compactMode;
+                    if (tableDensity) tableDensity.value = _notifPrefs.tableDensity || 'comfortable';
+                    
+                    // Color settings
+                    var colorIds = ['colorEpjNormal', 'colorEpjStore', 'colorEpjOverspill', 'colorEpjPreload', 'colorTypeFresh', 'colorTypeSwap', 'colorWorkedRow'];
+                    colorIds.forEach(function(cid) {
+                        var el = document.getElementById('pref' + cid.charAt(0).toUpperCase() + cid.slice(1));
+                        if (el && _notifPrefs[cid]) el.value = _notifPrefs[cid];
+                    });
+                    
+                    // Column visibility
+                    var colIds = ['Driver', 'Carrier', 'Epj', 'Type', 'Truck', 'Trailer', 'Route', 'Time', 'Worked', 'Actions'];
+                    colIds.forEach(function(col) {
+                        var cb = document.getElementById('prefCol' + col);
+                        if (cb) cb.checked = _notifPrefs['col' + col] !== false;
+                    });
                     
                     // Apply compact mode
                     var tables = document.querySelectorAll('table');
@@ -1043,16 +1554,133 @@
                         } else {
                             t.classList.remove('compact-table');
                         }
+                        // Apply density
+                        t.classList.remove('density-compact', 'density-comfortable', 'density-spacious');
+                        t.classList.add('density-' + (_notifPrefs.tableDensity || 'comfortable'));
+                    });
+                    
+                    // Apply custom colors via CSS variables
+                    applyCustomColors();
+                    
+                    // Apply column visibility
+                    applyColumnVisibility();
+                }
+                
+                function applyCustomColors() {
+                    // Create or update a style element for custom colors
+                    var styleId = 'custom-color-styles';
+                    var styleEl = document.getElementById(styleId);
+                    if (!styleEl) {
+                        styleEl = document.createElement('style');
+                        styleEl.id = styleId;
+                        // Append to end of body to ensure it loads last and has highest priority
+                        document.body.appendChild(styleEl);
+                    }
+                    
+                    // Use defaults if prefs not loaded
+                    var colors = {
+                        normal: _notifPrefs.colorEpjNormal || _defaultColors.colorEpjNormal || '#1976d2',
+                        store: _notifPrefs.colorEpjStore || _defaultColors.colorEpjStore || '#f9a825',
+                        overspill: _notifPrefs.colorEpjOverspill || _defaultColors.colorEpjOverspill || '#9c27b0',
+                        preload: _notifPrefs.colorEpjPreload || _defaultColors.colorEpjPreload || '#00acc1',
+                        fresh: _notifPrefs.colorTypeFresh || _defaultColors.colorTypeFresh || '#1565c0',
+                        swap: _notifPrefs.colorTypeSwap || _defaultColors.colorTypeSwap || '#e65100',
+                        worked: _notifPrefs.colorWorkedRow || _defaultColors.colorWorkedRow || '#4caf50'
+                    };
+                    
+                    // Use higher specificity selectors to ensure they override defaults
+                    var css = '';
+                    css += 'table#activeCheckoutsTable tbody tr td span.epj-badge { background: ' + colors.normal + ' !important; }';
+                    css += 'table#activeCheckoutsTable tbody tr td span.epj-badge.store-only { background: ' + colors.store + ' !important; color: #000 !important; }';
+                    css += 'table#activeCheckoutsTable tbody tr td span.epj-badge.overspill { background: ' + colors.overspill + ' !important; }';
+                    css += 'table#activeCheckoutsTable tbody tr td span.epj-badge.preload { background: ' + colors.preload + ' !important; }';
+                    css += 'table#activeCheckoutsTable tbody tr td span.checkout-type.fresh { background: ' + hexToRgba(colors.fresh, 0.15) + ' !important; color: ' + colors.fresh + ' !important; }';
+                    css += 'table#activeCheckoutsTable tbody tr td span.checkout-type.swap { background: ' + hexToRgba(colors.swap, 0.15) + ' !important; color: ' + colors.swap + ' !important; }';
+                    css += 'table#activeCheckoutsTable tbody tr.is-worked { background: ' + hexToRgba(colors.worked, 0.1) + ' !important; }';
+                    
+                    styleEl.textContent = css;
+                }
+                
+                function hexToRgba(hex, alpha) {
+                    var r = parseInt(hex.slice(1, 3), 16);
+                    var g = parseInt(hex.slice(3, 5), 16);
+                    var b = parseInt(hex.slice(5, 7), 16);
+                    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+                }
+                
+                function applyColumnVisibility() {
+                    var colIndexMap = {
+                        'Driver': 0, 'Carrier': 1, 'Epj': 2, 'Type': 3, 'Truck': 4,
+                        'Trailer': 5, 'Route': 6, 'Time': 7, 'Worked': 8, 'Actions': 9
+                    };
+                    var table = document.getElementById('activeCheckoutsTable');
+                    if (!table) return;
+                    
+                    Object.keys(colIndexMap).forEach(function(col) {
+                        var idx = colIndexMap[col];
+                        var visible = _notifPrefs['col' + col] !== false;
+                        
+                        // Update header
+                        var th = table.querySelector('thead tr th:nth-child(' + (idx + 1) + ')');
+                        if (th) {
+                            if (visible) th.classList.remove('col-hidden');
+                            else th.classList.add('col-hidden');
+                        }
+                        
+                        // Update all body cells
+                        var tds = table.querySelectorAll('tbody tr td:nth-child(' + (idx + 1) + ')');
+                        tds.forEach(function(td) {
+                            if (visible) td.classList.remove('col-hidden');
+                            else td.classList.add('col-hidden');
+                        });
                     });
                 }
                 
                 function setupPrefsListeners() {
-                    var prefIds = ['prefSoundEnabled', 'prefFreshLoginSound', 'prefSwapSound', 'prefVolume', 'prefVisualNotify', 'prefAutoRefresh', 'prefCompactMode'];
+                    // Sound and display prefs
+                    var prefIds = ['prefSoundEnabled', 'prefFreshLoginSound', 'prefSwapSound', 'prefVolume', 'prefVisualNotify', 'prefAutoRefresh', 'prefCompactMode', 'prefTableDensity'];
                     prefIds.forEach(function(id) {
                         var el = document.getElementById(id);
                         if (el) {
                             el.addEventListener('change', function() {
                                 updatePrefFromElement(id);
+                            });
+                            // For range input, also update on input (live preview)
+                            if (el.type === 'range') {
+                                el.addEventListener('input', function() {
+                                    var display = document.getElementById('volumeDisplay');
+                                    if (display) display.textContent = el.value + '%';
+                                });
+                            }
+                        }
+                    });
+                    
+                    // Color pickers
+                    var colorIds = ['prefColorEpjNormal', 'prefColorEpjStore', 'prefColorEpjOverspill', 'prefColorEpjPreload', 'prefColorTypeFresh', 'prefColorTypeSwap', 'prefColorWorkedRow'];
+                    colorIds.forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) {
+                            el.addEventListener('change', function() {
+                                var prefKey = id.replace('pref', '');
+                                prefKey = prefKey.charAt(0).toLowerCase() + prefKey.slice(1);
+                                _notifPrefs[prefKey] = el.value;
+                                saveNotificationPrefs();
+                                applyCustomColors();
+                            });
+                        }
+                    });
+                    
+                    // Column visibility toggles
+                    var colIds = ['prefColDriver', 'prefColCarrier', 'prefColEpj', 'prefColType', 'prefColTruck', 'prefColTrailer', 'prefColRoute', 'prefColTime', 'prefColWorked', 'prefColActions'];
+                    colIds.forEach(function(id) {
+                        var el = document.getElementById(id);
+                        if (el) {
+                            el.addEventListener('change', function() {
+                                var prefKey = id.replace('pref', '');
+                                prefKey = prefKey.charAt(0).toLowerCase() + prefKey.slice(1);
+                                _notifPrefs[prefKey] = el.checked;
+                                saveNotificationPrefs();
+                                applyColumnVisibility();
                             });
                         }
                     });
@@ -1076,9 +1704,60 @@
                             _notifPrefs.compactMode = el.checked;
                             applyNotificationPrefs();
                             break;
+                        case 'prefTableDensity':
+                            _notifPrefs.tableDensity = el.value;
+                            applyNotificationPrefs();
+                            break;
                     }
                     saveNotificationPrefs();
                 }
+                
+                // Reset colors to defaults
+                window.resetColorDefaults = function() {
+                    Object.keys(_defaultColors).forEach(function(key) {
+                        _notifPrefs[key] = _defaultColors[key];
+                        var inputId = 'pref' + key.charAt(0).toUpperCase() + key.slice(1);
+                        var el = document.getElementById(inputId);
+                        if (el) el.value = _defaultColors[key];
+                    });
+                    saveNotificationPrefs();
+                    applyCustomColors();
+                };
+                
+                // Export settings to JSON file
+                window.exportSettings = function() {
+                    var dataStr = JSON.stringify(_notifPrefs, null, 2);
+                    var blob = new Blob([dataStr], { type: 'application/json' });
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'dsim_settings_' + new Date().toISOString().split('T')[0] + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                };
+                
+                // Import settings from JSON file
+                window.importSettings = function(event) {
+                    var file = event.target.files[0];
+                    if (!file) return;
+                    
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            var imported = JSON.parse(e.target.result);
+                            _notifPrefs = Object.assign(_notifPrefs, imported);
+                            saveNotificationPrefs();
+                            applyNotificationPrefs();
+                            alert('Settings imported successfully!');
+                        } catch (err) {
+                            alert('Error importing settings: ' + err.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                    event.target.value = ''; // Reset for re-import
+                };
                 
                 function restartAutoRefresh() {
                     if (window.dashboardRefreshTimer) {
@@ -1222,6 +1901,117 @@
                             playTone(ctx, now, 600, 'sine', volume, 0.08);
                             playTone(ctx, now + 0.12, 900, 'sine', volume, 0.08);
                             break;
+                        
+                        // New melodic sounds
+                        case 'harp':
+                            // Harp glissando
+                            playTone(ctx, now, 523.25, 'sine', volume * 0.8, 0.12);
+                            playTone(ctx, now + 0.08, 587.33, 'sine', volume * 0.7, 0.12);
+                            playTone(ctx, now + 0.16, 659.25, 'sine', volume * 0.6, 0.12);
+                            playTone(ctx, now + 0.24, 783.99, 'sine', volume * 0.8, 0.25);
+                            break;
+                            
+                        case 'marimba':
+                            // Marimba-style wooden tone
+                            playTone(ctx, now, 440, 'triangle', volume, 0.15);
+                            playTone(ctx, now, 880, 'triangle', volume * 0.3, 0.1);
+                            playTone(ctx, now + 0.18, 554.37, 'triangle', volume * 0.8, 0.2);
+                            break;
+                            
+                        case 'click':
+                            // Sharp click
+                            playTone(ctx, now, 2000, 'square', volume * 0.3, 0.02);
+                            playTone(ctx, now + 0.02, 1000, 'sine', volume * 0.2, 0.03);
+                            break;
+                            
+                        case 'tap':
+                            // Soft tap
+                            playTone(ctx, now, 400, 'sine', volume * 0.6, 0.05);
+                            playTone(ctx, now, 800, 'sine', volume * 0.2, 0.03);
+                            break;
+                            
+                        case 'horn':
+                            // Air horn (two-tone)
+                            playTone(ctx, now, 349.23, 'sawtooth', volume * 0.4, 0.3);
+                            playTone(ctx, now, 440, 'sawtooth', volume * 0.4, 0.3);
+                            break;
+                            
+                        case 'whistle':
+                            // Whistle
+                            var osc2 = ctx.createOscillator();
+                            var gain2 = ctx.createGain();
+                            osc2.connect(gain2);
+                            gain2.connect(ctx.destination);
+                            osc2.type = 'sine';
+                            osc2.frequency.setValueAtTime(1800, now);
+                            osc2.frequency.setValueAtTime(2200, now + 0.1);
+                            osc2.frequency.setValueAtTime(1800, now + 0.2);
+                            gain2.gain.setValueAtTime(0, now);
+                            gain2.gain.linearRampToValueAtTime(volume * 0.5, now + 0.02);
+                            gain2.gain.setValueAtTime(volume * 0.5, now + 0.25);
+                            gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                            osc2.start(now);
+                            osc2.stop(now + 0.35);
+                            break;
+                            
+                        case 'buzzer':
+                            // Buzzer
+                            playTone(ctx, now, 200, 'sawtooth', volume * 0.3, 0.2);
+                            playTone(ctx, now, 400, 'sawtooth', volume * 0.15, 0.2);
+                            break;
+                            
+                        case 'triple-beep':
+                            // Triple beep
+                            playTone(ctx, now, 700, 'sine', volume, 0.1);
+                            playTone(ctx, now + 0.15, 700, 'sine', volume, 0.1);
+                            playTone(ctx, now + 0.3, 700, 'sine', volume, 0.1);
+                            break;
+                            
+                        case 'siren':
+                            // Mini siren
+                            var osc3 = ctx.createOscillator();
+                            var gain3 = ctx.createGain();
+                            osc3.connect(gain3);
+                            gain3.connect(ctx.destination);
+                            osc3.type = 'sine';
+                            osc3.frequency.setValueAtTime(600, now);
+                            osc3.frequency.linearRampToValueAtTime(900, now + 0.15);
+                            osc3.frequency.linearRampToValueAtTime(600, now + 0.3);
+                            gain3.gain.setValueAtTime(volume * 0.6, now);
+                            gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                            osc3.start(now);
+                            osc3.stop(now + 0.35);
+                            break;
+                            
+                        case 'whoosh':
+                            // Whoosh (reverse swoosh)
+                            var osc4 = ctx.createOscillator();
+                            var gain4 = ctx.createGain();
+                            osc4.connect(gain4);
+                            gain4.connect(ctx.destination);
+                            osc4.type = 'sine';
+                            osc4.frequency.setValueAtTime(1200, now);
+                            osc4.frequency.exponentialRampToValueAtTime(300, now + 0.25);
+                            gain4.gain.setValueAtTime(volume * 0.7, now);
+                            gain4.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                            osc4.start(now);
+                            osc4.stop(now + 0.3);
+                            break;
+                            
+                        case 'slide':
+                            // Slide up
+                            var osc5 = ctx.createOscillator();
+                            var gain5 = ctx.createGain();
+                            osc5.connect(gain5);
+                            gain5.connect(ctx.destination);
+                            osc5.type = 'sine';
+                            osc5.frequency.setValueAtTime(400, now);
+                            osc5.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+                            gain5.gain.setValueAtTime(volume, now);
+                            gain5.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                            osc5.start(now);
+                            osc5.stop(now + 0.2);
+                            break;
                             
                         default:
                             // Fallback to simple beep
@@ -1243,9 +2033,11 @@
                     osc.stop(startTime + duration);
                 }
                 
-                // Initialize preferences on load
+                // Initialize preferences IMMEDIATELY (before dashboard loads)
+                loadNotificationPrefs();
+                
+                // Setup listeners after a short delay to ensure DOM is ready
                 setTimeout(function() {
-                    loadNotificationPrefs();
                     setupPrefsListeners();
                 }, 100);
                 
@@ -1432,8 +2224,13 @@
                     if (checkouts && checkouts.length > 0) {
                         checkouts.forEach(function(trip) {
                             var isOverspill = trip.epj === 'N/A - Overspill';
-                            var epjClass = isOverspill ? 'epj-badge overspill' : 'epj-badge';
-                            var epjDisplay = isOverspill ? 'OS' : trip.epj;
+                            var isPreload = trip.epj === 'N/A - Pre-Load';
+                            var isStoreOnly = trip.storeOnly === true;
+                            var epjClass = 'epj-badge';
+                            if (isOverspill) epjClass += ' overspill';
+                            else if (isPreload) epjClass += ' preload';
+                            else if (isStoreOnly) epjClass += ' store-only';
+                            var epjDisplay = isOverspill ? 'OS' : (isPreload ? 'PRE' : trip.epj);
                             var timeOnly = trip.timestamp.split(',')[1] || trip.timestamp; // Get just time part
                             
                             // Determine checkout type (Swap vs Fresh)
@@ -1467,6 +2264,10 @@
                     } else {
                         activeTableBody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📫</div><h4>No Active Checkouts</h4><p>All drivers are currently checked in. New checkouts will appear here automatically.</p></div></td></tr>';
                     }
+                    
+                    // Re-apply custom colors and column visibility after table render
+                    applyCustomColors();
+                    applyColumnVisibility();
                 }
                 
                 function updateLastRefreshTime() {
@@ -1832,9 +2633,78 @@
                 };
 
                 window.forceCheckIn = function(tripId, epj) {
-                    if (confirm('Are you sure you want to force check-in EPJ ' + epj + '?')) {
-                        google.script.run.withSuccessHandler(handleSuccess).adminForceCheckIn({token: _token, tripId: tripId, epj: epj});
-                    }
+                    // Open force check-in modal with location selection
+                    var modal = document.getElementById('forceCheckinModal');
+                    document.getElementById('forceCheckinTripId').value = tripId;
+                    document.getElementById('forceCheckinEpj').textContent = epj;
+                    document.getElementById('forceCheckinFeedback').textContent = '';
+                    
+                    // Load zones from the server
+                    var locationSelect = document.getElementById('forceCheckinLocation');
+                    locationSelect.innerHTML = '<option value="">Loading zones...</option>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(zones) {
+                            locationSelect.innerHTML = '<option value="">Select location (optional)</option>';
+                            if (zones && zones.length > 0) {
+                                zones.forEach(function(zone) {
+                                    var opt = document.createElement('option');
+                                    opt.value = zone;
+                                    opt.textContent = zone;
+                                    locationSelect.appendChild(opt);
+                                });
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            locationSelect.innerHTML = '<option value="">Select location (optional)</option>';
+                            console.log('Could not load zones:', err);
+                        })
+                        .getZonesList({token: _token});
+                    
+                    modal.classList.add('active');
+                };
+                
+                window.closeForceCheckinModal = function() {
+                    document.getElementById('forceCheckinModal').classList.remove('active');
+                };
+                
+                window.confirmForceCheckin = function() {
+                    var tripId = document.getElementById('forceCheckinTripId').value;
+                    var epj = document.getElementById('forceCheckinEpj').textContent;
+                    var location = document.getElementById('forceCheckinLocation').value;
+                    var feedback = document.getElementById('forceCheckinFeedback');
+                    var btn = document.getElementById('forceCheckinConfirmBtn');
+                    
+                    setButtonLoading(btn, true);
+                    feedback.textContent = 'Processing check-in...';
+                    feedback.style.color = '';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            setButtonLoading(btn, false);
+                            feedback.textContent = message;
+                            feedback.style.color = message.indexOf('Error') === -1 ? 'green' : 'red';
+                            
+                            if (message.indexOf('Error') === -1) {
+                                setTimeout(function() {
+                                    closeForceCheckinModal();
+                                    loadDashboardData();
+                                    refreshLiveCheckouts(true);
+                                }, 1500);
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            setButtonLoading(btn, false);
+                            feedback.textContent = 'Error: ' + (err.message || 'Unknown error');
+                            feedback.style.color = 'red';
+                        })
+                        .adminForceCheckIn({
+                            token: _token, 
+                            tripId: tripId, 
+                            epj: epj, 
+                            location: location || 'Admin Override'
+                        });
                 };
                 
                 // Toggle worked status for a checkout
@@ -2275,6 +3145,286 @@
                             isOverspill: isOverspill
                         });
                 };
+                
+                // ==================== ANNOUNCEMENTS ====================
+                
+                window.loadAnnouncements = function() {
+                    var container = document.getElementById('announcementsList');
+                    if (!container) return;
+                    
+                    container.innerHTML = '<p style="text-align:center; color:var(--muted-color);">Loading...</p>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(announcements) {
+                            if (!announcements || announcements.length === 0) {
+                                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📢</div><h4>No Active Announcements</h4><p>Create an announcement to broadcast to all drivers.</p></div>';
+                                return;
+                            }
+                            
+                            var html = '';
+                            announcements.forEach(function(ann) {
+                                var priorityClass = 'priority-' + ann.priority;
+                                var statusText = ann.active ? (ann.expired ? '<span style="color:#f44336;">Expired</span>' : '<span style="color:#4caf50;">Active</span>') : '<span style="color:#9e9e9e;">Deleted</span>';
+                                
+                                html += '<div class="announcement-card ' + priorityClass + '">';
+                                html += '<button class="delete-btn" onclick="deleteAnnouncement(\'' + ann.id + '\')" title="Delete announcement">✕</button>';
+                                html += '<div class="announcement-meta">';
+                                html += '<span><span class="announcement-badge ' + priorityClass + '">' + ann.priority + '</span> by ' + ann.createdBy + '</span>';
+                                html += '<span>' + statusText + '</span>';
+                                html += '</div>';
+                                html += '<div class="announcement-message">' + escapeHtml(ann.message) + '</div>';
+                                html += '<div style="font-size:0.75rem; color:var(--muted-color);">';
+                                html += 'Created: ' + ann.created;
+                                if (ann.expiresAt) html += ' • Expires: ' + ann.expiresAt;
+                                html += '</div>';
+                                html += '</div>';
+                            });
+                            
+                            container.innerHTML = html;
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            container.innerHTML = '<p style="text-align:center; color:#f44336;">Error loading announcements</p>';
+                        })
+                        .adminGetAllAnnouncements({token: _token});
+                };
+                
+                window.createAnnouncement = function() {
+                    var message = document.getElementById('announcementMessage').value.trim();
+                    var priority = document.getElementById('announcementPriority').value;
+                    var expiresInHours = parseInt(document.getElementById('announcementExpiry').value) || 0;
+                    var btn = document.getElementById('createAnnouncementBtn');
+                    
+                    if (!message) {
+                        alert('Please enter an announcement message.');
+                        return;
+                    }
+                    
+                    setButtonLoading(btn, true);
+                    
+                    google.script.run
+                        .withSuccessHandler(function(result) {
+                            setButtonLoading(btn, false);
+                            if (result.success) {
+                                document.getElementById('announcementMessage').value = '';
+                                document.getElementById('announcementPriority').value = 'normal';
+                                document.getElementById('announcementExpiry').value = '24';
+                                loadAnnouncements();
+                                showFeedback('Announcement posted successfully!', 'green');
+                            } else {
+                                showFeedback('Error: ' + (result.message || 'Failed to create announcement'), 'red');
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            setButtonLoading(btn, false);
+                            showFeedback('Error: ' + (err.message || 'Unknown error'), 'red');
+                        })
+                        .adminCreateAnnouncement({
+                            token: _token,
+                            message: message,
+                            priority: priority,
+                            expiresInHours: expiresInHours
+                        });
+                };
+                
+                window.deleteAnnouncement = function(announcementId) {
+                    if (!confirm('Are you sure you want to delete this announcement?')) return;
+                    
+                    google.script.run
+                        .withSuccessHandler(function(result) {
+                            loadAnnouncements();
+                            showFeedback('Announcement deleted.', 'green');
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            showFeedback('Error deleting announcement', 'red');
+                        })
+                        .adminDeleteAnnouncement({token: _token, announcementId: announcementId});
+                };
+                
+                // ==================== REPORTS ====================
+                
+                window.loadDailySummary = function() {
+                    var container = document.getElementById('dailySummaryContent');
+                    if (!container) return;
+                    
+                    container.innerHTML = '<p style="text-align:center; color:var(--muted-color);">Loading...</p>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(data) {
+                            if (!data) {
+                                container.innerHTML = '<p style="text-align:center; color:var(--muted-color);">No data available</p>';
+                                return;
+                            }
+                            
+                            var html = '<div class="stat-grid">';
+                            html += '<div class="stat-card"><div class="stat-value">' + data.checkouts + '</div><div class="stat-label">Checkouts</div></div>';
+                            html += '<div class="stat-card"><div class="stat-value">' + data.checkins + '</div><div class="stat-label">Check-ins</div></div>';
+                            html += '<div class="stat-card"><div class="stat-value">' + data.activeTrips + '</div><div class="stat-label">Active</div></div>';
+                            html += '<div class="stat-card"><div class="stat-value">' + data.uniqueDrivers + '</div><div class="stat-label">Drivers</div></div>';
+                            html += '<div class="stat-card"><div class="stat-value">' + data.uniqueEpjs + '</div><div class="stat-label">EPJs Used</div></div>';
+                            html += '<div class="stat-card"><div class="stat-value">' + data.avgTripFormatted + '</div><div class="stat-label">Avg Trip</div></div>';
+                            html += '</div>';
+                            html += '<p style="text-align:center; font-size:0.8rem; color:var(--muted-color); margin:0;">Data for: ' + data.date + '</p>';
+                            
+                            container.innerHTML = html;
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            container.innerHTML = '<p style="text-align:center; color:#f44336;">Error loading summary</p>';
+                        })
+                        .getDailySummary({token: _token});
+                };
+                
+                window.loadPeakHours = function() {
+                    var container = document.getElementById('peakHoursContent');
+                    var daysBack = parseInt(document.getElementById('peakHoursDays').value) || 30;
+                    if (!container) return;
+                    
+                    container.innerHTML = '<p style="text-align:center; color:var(--muted-color);">Loading...</p>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(data) {
+                            if (!data || !data.hourly) {
+                                container.innerHTML = '<p style="text-align:center; color:var(--muted-color);">No data available</p>';
+                                return;
+                            }
+                            
+                            var maxCount = Math.max.apply(null, data.hourly.map(function(h) { return h.count; })) || 1;
+                            
+                            var html = '<div class="hour-bar-container">';
+                            data.hourly.forEach(function(h) {
+                                var height = Math.max(4, (h.count / maxCount) * 100);
+                                html += '<div class="hour-bar" style="height:' + height + '%;" data-count="' + h.count + '" title="' + h.label + ': ' + h.count + ' checkouts"></div>';
+                            });
+                            html += '</div>';
+                            
+                            html += '<div class="hour-labels">';
+                            for (var i = 0; i < 24; i += 4) {
+                                html += '<span>' + i.toString().padStart(2, '0') + '</span>';
+                            }
+                            html += '</div>';
+                            
+                            html += '<div style="margin-top:1rem; text-align:center;">';
+                            html += '<strong>Peak Hour:</strong> ' + data.peakHour + ' <span style="color:var(--muted-color);">(' + data.peakHourCount + ' checkouts)</span><br>';
+                            html += '<small style="color:var(--muted-color);">Total: ' + data.totalCheckouts + ' checkouts over ' + data.daysAnalyzed + ' days</small>';
+                            html += '</div>';
+                            
+                            container.innerHTML = html;
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            container.innerHTML = '<p style="text-align:center; color:#f44336;">Error loading peak hours</p>';
+                        })
+                        .getPeakHoursAnalysis({token: _token, daysBack: daysBack});
+                };
+                
+                window.loadDowntimeReport = function() {
+                    var container = document.getElementById('downtimeContent');
+                    var daysBack = parseInt(document.getElementById('downtimeDays').value) || 30;
+                    if (!container) return;
+                    
+                    container.innerHTML = '<p style="text-align:center; color:var(--muted-color);">Loading...</p>';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(data) {
+                            if (!data || !data.epjStats || data.epjStats.length === 0) {
+                                container.innerHTML = '<div style="text-align:center; padding:1rem;"><div style="font-size:2rem; margin-bottom:0.5rem;">✅</div><p style="color:var(--muted-color); margin:0;">No maintenance downtime in this period!</p></div>';
+                                return;
+                            }
+                            
+                            var html = '<div style="margin-bottom:1rem; text-align:center;">';
+                            html += '<strong>Total Downtime:</strong> ' + data.totalDowntimeHours + ' hours across ' + data.epjsWithDowntime + ' EPJs';
+                            html += '</div>';
+                            
+                            html += '<div style="max-height:200px; overflow-y:auto;">';
+                            data.epjStats.forEach(function(epj) {
+                                var classes = 'downtime-item' + (epj.isCurrentlyDown ? ' currently-down' : '');
+                                html += '<div class="' + classes + '">';
+                                html += '<span class="epj-name">' + epj.epj + (epj.isCurrentlyDown ? ' <span style="color:#f44336; font-size:0.75rem;">⚠ DOWN</span>' : '') + '</span>';
+                                html += '<span class="downtime-hours">' + epj.totalHours + 'h (' + epj.incidents + ' incidents)</span>';
+                                html += '</div>';
+                            });
+                            html += '</div>';
+                            
+                            container.innerHTML = html;
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            container.innerHTML = '<p style="text-align:center; color:#f44336;">Error loading downtime report</p>';
+                        })
+                        .getEpjDowntimeReport({token: _token, daysBack: daysBack});
+                };
+                
+                window.exportCheckoutHistory = function() {
+                    var startDate = document.getElementById('exportStartDate').value;
+                    var endDate = document.getElementById('exportEndDate').value;
+                    
+                    if (!startDate || !endDate) {
+                        alert('Please select both start and end dates.');
+                        return;
+                    }
+                    
+                    showFeedback('Generating export...', '');
+                    
+                    google.script.run
+                        .withSuccessHandler(function(csvData) {
+                            // Create and download CSV file
+                            var blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+                            var link = document.createElement('a');
+                            var url = URL.createObjectURL(blob);
+                            link.setAttribute('href', url);
+                            link.setAttribute('download', 'checkout_history_' + startDate + '_to_' + endDate + '.csv');
+                            link.style.visibility = 'hidden';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            showFeedback('Export downloaded successfully!', 'green');
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            showFeedback('Error generating export: ' + (err.message || 'Unknown error'), 'red');
+                        })
+                        .exportCheckoutDataCsv({
+                            token: _token,
+                            startDate: startDate,
+                            endDate: endDate
+                        });
+                };
+                
+                // Initialize reports when tab is clicked
+                document.querySelector('.tab-btn[data-tab="reports"]').addEventListener('click', function() {
+                    // Set default dates if not set
+                    var startInput = document.getElementById('exportStartDate');
+                    var endInput = document.getElementById('exportEndDate');
+                    if (startInput && !startInput.value) {
+                        var weekAgo = new Date();
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        startInput.value = weekAgo.toISOString().split('T')[0];
+                    }
+                    if (endInput && !endInput.value) {
+                        endInput.value = new Date().toISOString().split('T')[0];
+                    }
+                    
+                    // Load report data
+                    loadDailySummary();
+                    loadPeakHours();
+                    loadDowntimeReport();
+                });
+                
+                // Initialize announcements when tab is clicked
+                document.querySelector('.tab-btn[data-tab="announcements"]').addEventListener('click', function() {
+                    loadAnnouncements();
+                });
+                
+                // Helper function
+                function escapeHtml(text) {
+                    var div = document.createElement('div');
+                    div.appendChild(document.createTextNode(text));
+                    return div.innerHTML;
+                }
             })();
         </script>
     </body>

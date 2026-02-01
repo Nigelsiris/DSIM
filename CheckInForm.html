@@ -89,6 +89,51 @@
         .modal-close:hover {
             color: var(--pico-primary);
         }
+        
+        /* Overspill Get EPJ section */
+        .overspill-section {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .overspill-section h4 {
+            color: #e65100;
+            margin: 0 0 0.5rem 0;
+        }
+        .overspill-section .info-text {
+            color: #f57c00;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        /* EPJ info display */
+        #epjInfoDisplay {
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            background-color: var(--pico-card-background-color, #f8f9fa);
+            border: 1px solid var(--pico-muted-border-color, #dee2e6);
+            margin-top: 0.5rem;
+            min-height: 60px;
+        }
+        
+        /* Update trip info section */
+        .update-trip-section {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .update-trip-section summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #1565c0;
+        }
+        .update-trip-section[open] summary {
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -101,6 +146,56 @@
             
             <h2>Driver Check-In</h2>
             <p>Welcome back, <b><?!= username; ?></b></p>
+            
+            <? if (isOverspill) { ?>
+            <!-- OVERSPILL DRIVER VIEW -->
+            <p>You are currently checked out under <b>Overspill/Pre-Load</b> (no EPJ assigned).</p>
+            
+            <!-- Get an EPJ Section -->
+            <div class="overspill-section">
+                <h4>🚜 Need an EPJ Now?</h4>
+                <p class="info-text">If you've been assigned a route and need an EPJ, you can get one here.</p>
+                
+                <details class="update-trip-section" id="updateTripDetails">
+                    <summary>📝 Update Route / Truck / Trailer Info</summary>
+                    <div class="grid">
+                        <label>Truck Number
+                            <input type="text" id="updateTruck" value="<?!= currentTruck; ?>" placeholder="Enter truck number">
+                        </label>
+                        <label>Trailer Number
+                            <input type="text" id="updateTrailer" value="<?!= currentTrailer; ?>" placeholder="Enter trailer number">
+                        </label>
+                    </div>
+                    <label>Route
+                        <input type="text" id="updateRoute" value="<?!= currentRoute; ?>" placeholder="e.g. 1234 / ABC / Zone-5">
+                    </label>
+                </details>
+                
+                <label for="overspillZoneFilter">Filter EPJs by Zone</label>
+                <select id="overspillZoneFilter" disabled>
+                    <option value="All">Loading zones...</option>
+                </select>
+                
+                <label for="overspillEpjSelect">Select EPJ</label>
+                <select id="overspillEpjSelect" disabled>
+                    <option value="" disabled selected>Loading EPJs...</option>
+                </select>
+                
+                <div id="epjInfoDisplay"><small>Select an EPJ to see its location and status.</small></div>
+                
+                <button id="getEpjBtn" onclick="doGetEpj()" style="margin-top:1rem;"><span>🚜 Get EPJ & Continue Trip</span></button>
+                <p id="getEpjFeedback" style="text-align:center; min-height:20px;"></p>
+            </div>
+            
+            <hr style="margin: 1.5rem 0;">
+            
+            <h4>Or Check Out Completely</h4>
+            <p style="color: var(--pico-muted-color); font-size:0.9rem;">If you're done for the day and don't need an EPJ:</p>
+            <button id="checkInBtn" class="secondary" onclick="doCheckIn()"><span>✓ Complete Check-Out (No EPJ)</span></button>
+            <p id="feedback" style="text-align:center; min-height:20px;"></p>
+            
+            <? } else { ?>
+            <!-- NORMAL DRIVER VIEW (has EPJ) -->
             <p>You currently have <b>EPJ <?!= currentEpj; ?></b> checked out.</p>
             
             <button id="changeEpjBtn" class="outline secondary" style="margin-bottom: 1rem;" onclick="openEpjSwapModal()">
@@ -108,8 +203,8 @@
             </button>
             
             <label for="checkInZone">Final Location of EPJ</label>
-            <select id="checkInZone" disabled>
-                <option>Loading zones...</option>
+            <select id="checkInZone">
+                <?!= zoneOptions || '<option value="Unknown">Unknown Location</option>'; ?>
             </select>
 
             <label for="faultReport">Post-Trip: Report any new issues (optional)</label>
@@ -121,8 +216,9 @@
             </label>
 
 
-            <button id="checkInBtn" onclick="doCheckIn()" disabled><span>Complete Check-In</span></button>
-            <p id="feedback" style="text-align:center; min-height:20px;">Loading...</p>
+            <button id="checkInBtn" onclick="doCheckIn()"><span>Complete Check-In</span></button>
+            <p id="feedback" style="text-align:center; min-height:20px;"></p>
+            <? } ?>
         </article>
         
         <!-- EPJ Swap Modal -->
@@ -135,10 +231,19 @@
                 
                 <p style="margin-bottom: 1rem;">Current EPJ: <strong><?!= currentEpj; ?></strong></p>
                 
+                <label for="swapZoneFilter">Filter by Zone</label>
+                <select id="swapZoneFilter">
+                    <option value="All">Loading zones...</option>
+                </select>
+                
                 <label for="swapNewEpj">Select New EPJ</label>
                 <select id="swapNewEpj">
                     <option value="" disabled selected>Loading available EPJs...</option>
                 </select>
+                
+                <div id="swapEpjInfoDisplay" style="padding:0.75rem; border-radius:0.25rem; background:var(--pico-card-background-color, #f8f9fa); border:1px solid var(--pico-muted-border-color, #dee2e6); margin-bottom:1rem; min-height:60px;">
+                    <small>Select an EPJ to see its location and status.</small>
+                </div>
                 
                 <label for="swapCurrentLocation">Where is your current EPJ?</label>
                 <select id="swapCurrentLocation">
@@ -163,34 +268,207 @@
             // Use the parent's sessionToken - do NOT redeclare with var/let/const
             var _token = (typeof sessionToken !== 'undefined' && sessionToken) ? sessionToken : "<?= token ?>";
             var _currentEpj = "<?!= currentEpj; ?>";
+            var _isOverspill = <?= isOverspill ? 'true' : 'false' ?>;
+            var _epjInfoMap = {};
+            var _availableEpjsData = [];
             
             // Load zone options and EPJ details asynchronously
             function loadCheckinData() {
+                console.log('loadCheckinData called, token:', _token ? 'present' : 'missing', 'epj:', _currentEpj);
+                var checkInBtn = document.getElementById('checkInBtn');
+                var feedback = document.getElementById('feedback');
+                var checkInZone = document.getElementById('checkInZone');
+                
+                if (!checkInZone) {
+                    console.error('checkInZone element not found!');
+                    return;
+                }
+                
+                // Set a timeout - if zones don't load in 15 seconds, show error with retry
+                var loadTimeout = setTimeout(function() {
+                    console.log('loadCheckinData timeout triggered');
+                    if (feedback) {
+                        feedback.innerHTML = 'Loading took too long. <a href="#" onclick="location.reload();return false;">Click to retry</a>';
+                    }
+                    if (checkInZone) {
+                        checkInZone.innerHTML = '<option value="Unknown">Unknown Location</option>';
+                        checkInZone.disabled = false;
+                    }
+                    if (checkInBtn) checkInBtn.disabled = false;
+                }, 15000);
+                
                 google.script.run
                     .withSuccessHandler(function(data) {
-                        var checkInZone = document.getElementById('checkInZone');
+                        console.log('loadCheckinData success:', data);
+                        clearTimeout(loadTimeout);
                         if (checkInZone) {
-                            checkInZone.innerHTML = data.zoneOptions;
+                            checkInZone.innerHTML = data.zoneOptions || '<option value="Unknown">Unknown Location</option>';
                             checkInZone.disabled = false;
                         }
-                        var checkInBtn = document.getElementById('checkInBtn');
                         if (checkInBtn) checkInBtn.disabled = false;
-                        var feedback = document.getElementById('feedback');
                         if (feedback) feedback.innerText = '';
                     })
                     .withFailureHandler(function(error) {
-                        var feedback = document.getElementById('feedback');
+                        console.error('loadCheckinData failure:', error);
+                        clearTimeout(loadTimeout);
+                        if (checkInZone) {
+                            checkInZone.innerHTML = '<option value="Unknown">Unknown Location</option>';
+                            checkInZone.disabled = false;
+                        }
+                        if (checkInBtn) checkInBtn.disabled = false;
                         if (feedback) {
-                            feedback.innerText = 'Error loading zones: ' + (error.message || 'Unknown error');
+                            feedback.innerHTML = 'Could not load zones. <a href="#" onclick="location.reload();return false;">Retry</a> or select Unknown.';
                         }
                     })
                     .getCheckinFormData({token: _token, epj: _currentEpj});
+                
+                console.log('loadCheckinData request sent');
+            }
+            
+            // Load EPJ data for Overspill drivers
+            function loadOverspillData() {
+                var zoneFilter = document.getElementById('overspillZoneFilter');
+                var epjSelect = document.getElementById('overspillEpjSelect');
+                
+                google.script.run
+                    .withSuccessHandler(function(data) {
+                        if (!data || !data.availableEpjs) {
+                            if (epjSelect) epjSelect.innerHTML = '<option disabled>Error loading EPJs</option>';
+                            return;
+                        }
+                        
+                        // Store EPJ data
+                        _availableEpjsData = data.availableEpjs.map(function(item) {
+                            return typeof item === 'string' ? { epj: item, storeOnly: false } : item;
+                        });
+                        _epjInfoMap = data.epjInfoMap || {};
+                        
+                        // Populate zone filter
+                        if (zoneFilter && data.zoneOptions) {
+                            zoneFilter.innerHTML = '<option value="All">Show All Zones</option>' + data.zoneOptions;
+                            zoneFilter.disabled = false;
+                        }
+                        
+                        // Populate EPJ list
+                        updateOverspillEpjList();
+                        
+                        var getEpjBtn = document.getElementById('getEpjBtn');
+                        if (getEpjBtn) getEpjBtn.disabled = false;
+                    })
+                    .withFailureHandler(function(err) {
+                        var epjSelect = document.getElementById('overspillEpjSelect');
+                        if (epjSelect) epjSelect.innerHTML = '<option disabled>Error: ' + (err.message || 'Unknown') + '</option>';
+                    })
+                    .getCheckoutFormData({token: _token});
+            }
+            
+            function updateOverspillEpjList() {
+                var zoneFilter = document.getElementById('overspillZoneFilter');
+                var epjSelect = document.getElementById('overspillEpjSelect');
+                var selectedZone = zoneFilter ? zoneFilter.value : 'All';
+                
+                if (epjSelect) {
+                    epjSelect.innerHTML = '';
+                    epjSelect.disabled = false;
+                }
+                
+                var epjsShown = 0;
+                _availableEpjsData.forEach(function(item) {
+                    var epj = item.epj;
+                    var epjInfo = _epjInfoMap[epj];
+                    var epjZone = epjInfo ? epjInfo.location : 'Unknown';
+                    
+                    var matchesZone = selectedZone === 'All' || epjZone === selectedZone;
+                    
+                    if (matchesZone && epjSelect) {
+                        var opt = document.createElement('option');
+                        opt.value = epj;
+                        opt.textContent = epj + (item.storeOnly ? ' [Store Only]' : '') + ' - ' + epjZone;
+                        epjSelect.appendChild(opt);
+                        epjsShown++;
+                    }
+                });
+                
+                if (epjsShown === 0 && epjSelect) {
+                    var opt = document.createElement('option');
+                    opt.textContent = 'No EPJs available in this zone';
+                    opt.disabled = true;
+                    epjSelect.appendChild(opt);
+                }
+                
+                // Show info for first EPJ
+                if (epjSelect && epjSelect.value) {
+                    showEpjInfo(epjSelect.value);
+                }
+            }
+            
+            function showEpjInfo(epjNumber) {
+                var infoDisplay = document.getElementById('epjInfoDisplay');
+                if (!infoDisplay) return;
+                
+                var info = _epjInfoMap[epjNumber];
+                if (info) {
+                    var html = '<strong>' + epjNumber + '</strong><br>';
+                    html += '📍 Location: <b>' + (info.location || 'Unknown') + '</b><br>';
+                    if (info.lastDriver) html += '👤 Last Driver: ' + info.lastDriver + '<br>';
+                    if (info.lastFault) html += '⚠️ Reported Issue: <span style="color:#e65100;">' + info.lastFault + '</span>';
+                    infoDisplay.innerHTML = html;
+                } else {
+                    infoDisplay.innerHTML = '<small>No additional info available for this EPJ.</small>';
+                }
             }
             
             // Check-in function - exposed to global scope for onclick
             window.doCheckIn = function() {
-                var confirmationCheckbox = document.getElementById('pluggedInConfirmation');
                 var checkInBtn = document.getElementById('checkInBtn');
+                var feedback = document.getElementById('feedback');
+                
+                // For overspill, no confirmation needed - just end the trip
+                if (_isOverspill) {
+                    if (checkInBtn) {
+                        checkInBtn.classList.add('btn-loading');
+                        checkInBtn.disabled = true;
+                    }
+                    
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            if (message && message.startsWith && message.startsWith('Error:')) {
+                                if (checkInBtn) {
+                                    checkInBtn.classList.remove('btn-loading');
+                                    checkInBtn.disabled = false;
+                                }
+                                alert(message);
+                            } else {
+                                var article = document.querySelector('article');
+                                if (article) {
+                                    article.innerHTML = 
+                                        '<h2>Success!</h2>' +
+                                        '<p>' + message + '</p>' +
+                                        '<p>Returning to login screen...</p>';
+                                }
+                                setTimeout(function() {
+                                    if (typeof logout === 'function') logout();
+                                }, 2000);
+                            }
+                        })
+                        .withFailureHandler(function(error) {
+                            if (checkInBtn) {
+                                checkInBtn.classList.remove('btn-loading');
+                                checkInBtn.disabled = false;
+                            }
+                            alert('Error: ' + (error.message || 'Unknown error'));
+                        })
+                        .processCheckIn({
+                            token: _token, 
+                            checkInZone: 'Overspill - No EPJ', 
+                            faultReport: '',
+                            pluggedIn: true
+                        });
+                    return;
+                }
+                
+                // Normal check-in flow (with EPJ)
+                var confirmationCheckbox = document.getElementById('pluggedInConfirmation');
                 
                 if (!confirmationCheckbox || !confirmationCheckbox.checked) {
                     alert('You must confirm the EPJ is plugged in before checking it in.');
@@ -212,7 +490,6 @@
                     checkInBtn.classList.add('btn-loading');
                     checkInBtn.disabled = true;
                 }
-                var feedback = document.getElementById('feedback');
                 if (feedback) feedback.innerText = '';
                 
                 google.script.run
@@ -253,35 +530,147 @@
                     });
             };
             
-            // Initialize
-            loadCheckinData();
+            // Get EPJ function for Overspill drivers
+            window.doGetEpj = function() {
+                var epjSelect = document.getElementById('overspillEpjSelect');
+                var selectedEpj = epjSelect ? epjSelect.value : '';
+                var feedback = document.getElementById('getEpjFeedback');
+                var btn = document.getElementById('getEpjBtn');
+                
+                if (!selectedEpj) {
+                    if (feedback) {
+                        feedback.textContent = 'Please select an EPJ.';
+                        feedback.style.color = 'red';
+                    }
+                    return;
+                }
+                
+                // Get updated trip info
+                var truck = document.getElementById('updateTruck');
+                var trailer = document.getElementById('updateTrailer');
+                var route = document.getElementById('updateRoute');
+                
+                if (btn) {
+                    btn.classList.add('btn-loading');
+                    btn.disabled = true;
+                }
+                if (feedback) {
+                    feedback.textContent = 'Processing...';
+                    feedback.style.color = '';
+                }
+                
+                google.script.run
+                    .withSuccessHandler(function(message) {
+                        if (btn) {
+                            btn.classList.remove('btn-loading');
+                            btn.disabled = false;
+                        }
+                        
+                        if (message && message.indexOf('Error') !== -1) {
+                            if (feedback) {
+                                feedback.textContent = message;
+                                feedback.style.color = 'red';
+                            }
+                        } else {
+                            var article = document.querySelector('article');
+                            if (article) {
+                                article.innerHTML = 
+                                    '<h2>Success!</h2>' +
+                                    '<p>' + message + '</p>' +
+                                    '<p>Returning to login screen...</p>';
+                            }
+                            setTimeout(function() {
+                                if (typeof logout === 'function') logout();
+                            }, 2000);
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        if (btn) {
+                            btn.classList.remove('btn-loading');
+                            btn.disabled = false;
+                        }
+                        if (feedback) {
+                            feedback.textContent = 'Error: ' + (err.message || 'Unknown error');
+                            feedback.style.color = 'red';
+                        }
+                    })
+                    .overspillGetEpj({
+                        token: _token,
+                        epjNumber: selectedEpj,
+                        truckNumber: truck ? truck.value : '',
+                        trailerNumber: trailer ? trailer.value : '',
+                        route: route ? route.value : ''
+                    });
+            };
+            
+            // Initialize based on mode
+            console.log('CheckInForm init - isOverspill:', _isOverspill, 'epj:', _currentEpj);
+            if (_isOverspill) {
+                console.log('Loading Overspill data...');
+                loadOverspillData();
+                
+                // Set up zone filter change handler
+                var zoneFilter = document.getElementById('overspillZoneFilter');
+                if (zoneFilter) {
+                    zoneFilter.addEventListener('change', updateOverspillEpjList);
+                }
+                
+                // Set up EPJ select change handler
+                var epjSelect = document.getElementById('overspillEpjSelect');
+                if (epjSelect) {
+                    epjSelect.addEventListener('change', function() {
+                        showEpjInfo(this.value);
+                    });
+                }
+            } else {
+                // Zones are preloaded in the template, so just enable the button
+                console.log('Normal mode - zones preloaded, enabling UI');
+                var checkInBtn = document.getElementById('checkInBtn');
+                if (checkInBtn) checkInBtn.disabled = false;
+                var feedback = document.getElementById('feedback');
+                if (feedback) feedback.innerText = '';
+            }
+            
+            // EPJ Swap Modal - data storage
+            var _swapEpjsData = [];
+            var _swapEpjInfoMap = {};
             
             // EPJ Swap Modal Functions
             window.openEpjSwapModal = function() {
                 document.getElementById('swapFeedback').textContent = '';
                 document.getElementById('swapIssueReport').value = '';
+                document.getElementById('swapEpjInfoDisplay').innerHTML = '<small>Select an EPJ to see its location and status.</small>';
                 
                 // Load available EPJs
                 var epjSelect = document.getElementById('swapNewEpj');
+                var zoneFilter = document.getElementById('swapZoneFilter');
                 epjSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+                zoneFilter.innerHTML = '<option value="All">Loading zones...</option>';
                 
                 google.script.run
                     .withSuccessHandler(function(data) {
-                        epjSelect.innerHTML = '<option value="" disabled selected>Select new EPJ...</option>';
-                        if (data && data.availableEpjs && data.availableEpjs.length > 0) {
-                            data.availableEpjs.forEach(function(item) {
-                                var opt = document.createElement('option');
-                                opt.value = item.epj;
-                                opt.textContent = item.epj + (item.storeOnly ? ' [Store Only]' : '');
-                                epjSelect.appendChild(opt);
-                            });
-                        } else {
-                            epjSelect.innerHTML = '<option value="" disabled selected>No EPJs available</option>';
+                        if (!data || !data.availableEpjs) {
+                            epjSelect.innerHTML = '<option value="" disabled selected>Error loading EPJs</option>';
+                            return;
                         }
                         
-                        // Also populate the zone dropdown
+                        // Store data for filtering
+                        _swapEpjsData = data.availableEpjs.map(function(item) {
+                            return typeof item === 'string' ? { epj: item, storeOnly: false } : item;
+                        });
+                        _swapEpjInfoMap = data.epjInfoMap || {};
+                        
+                        // Populate zone filter
+                        if (data.zoneOptions) {
+                            zoneFilter.innerHTML = '<option value="All">Show All Zones</option>' + data.zoneOptions;
+                        }
+                        
+                        // Initial populate of EPJ list
+                        updateSwapEpjList();
+                        
+                        // Also populate the current location zone dropdown
                         var zoneSelect = document.getElementById('swapCurrentLocation');
-                        if (data && data.zoneOptions) {
+                        if (data.zoneOptions) {
                             zoneSelect.innerHTML = data.zoneOptions;
                         }
                     })
@@ -292,6 +681,75 @@
                 
                 document.getElementById('epjSwapModal').classList.add('active');
             };
+            
+            function updateSwapEpjList() {
+                var zoneFilter = document.getElementById('swapZoneFilter');
+                var epjSelect = document.getElementById('swapNewEpj');
+                var selectedZone = zoneFilter ? zoneFilter.value : 'All';
+                
+                epjSelect.innerHTML = '';
+                var defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.disabled = true;
+                defaultOpt.selected = true;
+                defaultOpt.textContent = 'Select new EPJ...';
+                epjSelect.appendChild(defaultOpt);
+                
+                var epjsShown = 0;
+                _swapEpjsData.forEach(function(item) {
+                    var epj = item.epj;
+                    var epjInfo = _swapEpjInfoMap[epj];
+                    var epjZone = epjInfo ? epjInfo.location : 'Unknown';
+                    
+                    var matchesZone = selectedZone === 'All' || epjZone === selectedZone;
+                    
+                    if (matchesZone) {
+                        var opt = document.createElement('option');
+                        opt.value = epj;
+                        opt.textContent = epj + (item.storeOnly ? ' [Store Only]' : '') + ' - ' + epjZone;
+                        epjSelect.appendChild(opt);
+                        epjsShown++;
+                    }
+                });
+                
+                if (epjsShown === 0) {
+                    var opt = document.createElement('option');
+                    opt.textContent = 'No EPJs available in this zone';
+                    opt.disabled = true;
+                    epjSelect.appendChild(opt);
+                }
+                
+                // Reset info display
+                document.getElementById('swapEpjInfoDisplay').innerHTML = '<small>Select an EPJ to see its location and status.</small>';
+            }
+            
+            function showSwapEpjInfo(epjNumber) {
+                var infoDisplay = document.getElementById('swapEpjInfoDisplay');
+                if (!infoDisplay || !epjNumber) return;
+                
+                var info = _swapEpjInfoMap[epjNumber];
+                if (info) {
+                    var html = '<strong>' + epjNumber + '</strong><br>';
+                    html += '📍 Location: <b>' + (info.location || 'Unknown') + '</b><br>';
+                    if (info.lastDriver) html += '👤 Last Driver: ' + info.lastDriver + '<br>';
+                    if (info.lastFault) html += '⚠️ Reported Issue: <span style="color:#e65100;">' + info.lastFault + '</span>';
+                    infoDisplay.innerHTML = html;
+                } else {
+                    infoDisplay.innerHTML = '<small>No additional info available for this EPJ.</small>';
+                }
+            }
+            
+            // Set up swap modal event handlers (only if elements exist - normal mode)
+            var swapZoneFilterEl = document.getElementById('swapZoneFilter');
+            var swapNewEpjEl = document.getElementById('swapNewEpj');
+            if (swapZoneFilterEl) {
+                swapZoneFilterEl.addEventListener('change', updateSwapEpjList);
+            }
+            if (swapNewEpjEl) {
+                swapNewEpjEl.addEventListener('change', function() {
+                    showSwapEpjInfo(this.value);
+                });
+            }
             
             window.closeEpjSwapModal = function() {
                 document.getElementById('epjSwapModal').classList.remove('active');
@@ -331,46 +789,18 @@
                             feedback.textContent = message;
                             feedback.style.color = 'red';
                         } else {
-                            feedback.textContent = message;
+                            feedback.textContent = message + ' Logging you out...';
                             feedback.style.color = 'green';
                             
-                            // Reload the page to show new EPJ info
+                            // Log the driver out after successful swap
                             setTimeout(function() {
                                 closeEpjSwapModal();
-                                // Use the parent's goBackToUserView function to properly reload
-                                if (typeof goBackToUserView === 'function') {
-                                    goBackToUserView();
+                                if (typeof logout === 'function') {
+                                    logout();
                                 } else {
-                                    // Fallback: reload using getUserView through loadView
-                                    google.script.run
-                                        .withSuccessHandler(function(html) {
-                                            if (typeof loadView === 'function') {
-                                                loadView(html);
-                                            } else {
-                                                // Last resort: update content div directly
-                                                var contentDiv = document.getElementById('content');
-                                                if (contentDiv) {
-                                                    contentDiv.innerHTML = html;
-                                                    // Re-execute scripts
-                                                    var scripts = contentDiv.getElementsByTagName('script');
-                                                    for (var i = 0; i < scripts.length; i++) {
-                                                        var script = document.createElement('script');
-                                                        script.type = 'text/javascript';
-                                                        if (scripts[i].innerText) {
-                                                            script.innerText = scripts[i].innerText;
-                                                        }
-                                                        document.body.appendChild(script).parentNode.removeChild(script);
-                                                    }
-                                                }
-                                            }
-                                        })
-                                        .withFailureHandler(function() {
-                                            alert('EPJ swapped successfully! Please log in again to continue.');
-                                            if (typeof logout === 'function') logout();
-                                        })
-                                        .getUserView(_token);
+                                    alert('EPJ swapped successfully! Please log in again.');
                                 }
-                            }, 1500);
+                            }, 2000);
                         }
                     })
                     .withFailureHandler(function(err) {
