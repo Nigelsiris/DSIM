@@ -479,13 +479,43 @@
                     // Apply site-wide defaults from admin settings
                     if (data.siteSettings) {
                         var ss = data.siteSettings;
-                        // Default overspill toggle
-                        if (ss.defaultOverspill && overspillCheckbox && !overspillCheckbox.checked) {
+                        var currentHour = new Date().getHours();
+                        
+                        // Determine if overspill should be defaulted on
+                        // Schedule takes priority when set (start/end >= 0)
+                        var shouldDefaultOverspill = false;
+                        if (ss.overspillStartHour >= 0 && ss.overspillEndHour >= 0) {
+                            // Schedule is configured — check if current hour is within range
+                            if (ss.overspillStartHour <= ss.overspillEndHour) {
+                                // Same-day range (e.g. 2am-2pm)
+                                shouldDefaultOverspill = (currentHour >= ss.overspillStartHour && currentHour < ss.overspillEndHour);
+                            } else {
+                                // Overnight range (e.g. 10pm-6am)
+                                shouldDefaultOverspill = (currentHour >= ss.overspillStartHour || currentHour < ss.overspillEndHour);
+                            }
+                        } else {
+                            // No schedule — fall back to simple toggle
+                            shouldDefaultOverspill = !!ss.defaultOverspill;
+                        }
+                        
+                        if (shouldDefaultOverspill && overspillCheckbox && !overspillCheckbox.checked) {
                             overspillCheckbox.checked = true;
                             overspillCheckbox.dispatchEvent(new Event('change'));
                         }
-                        // Default preload toggle
-                        if (ss.defaultPreload && preloadCheckbox && !preloadCheckbox.checked) {
+                        
+                        // Determine if preload should be defaulted on
+                        var shouldDefaultPreload = false;
+                        if (ss.preloadStartHour >= 0 && ss.preloadEndHour >= 0) {
+                            if (ss.preloadStartHour <= ss.preloadEndHour) {
+                                shouldDefaultPreload = (currentHour >= ss.preloadStartHour && currentHour < ss.preloadEndHour);
+                            } else {
+                                shouldDefaultPreload = (currentHour >= ss.preloadStartHour || currentHour < ss.preloadEndHour);
+                            }
+                        } else {
+                            shouldDefaultPreload = !!ss.defaultPreload;
+                        }
+                        
+                        if (shouldDefaultPreload && preloadCheckbox && !preloadCheckbox.checked) {
                             preloadCheckbox.checked = true;
                             preloadCheckbox.dispatchEvent(new Event('change'));
                         }

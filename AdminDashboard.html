@@ -1358,13 +1358,69 @@
                             <label for="siteDefaultOverspill">Default sign-in to Overspill</label>
                             <input type="checkbox" id="siteDefaultOverspill" role="switch">
                         </div>
-                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.75rem; color:var(--muted-color);">Overspill checkbox will be pre-checked for all drivers.</small>
+                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.5rem; color:var(--muted-color);">Overspill checkbox will be pre-checked for all drivers.</small>
+                        
+                        <div id="overspillScheduleRow" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; padding-left:0.5rem;">
+                            <label style="font-size:0.85rem; margin:0; white-space:nowrap;">⏰ Schedule:</label>
+                            <select id="siteOverspillStart" style="width:auto; min-width:90px; margin:0; padding:0.3rem;">
+                                <option value="-1">Off</option>
+                                <option value="0">12 AM</option><option value="1">1 AM</option><option value="2">2 AM</option>
+                                <option value="3">3 AM</option><option value="4">4 AM</option><option value="5">5 AM</option>
+                                <option value="6">6 AM</option><option value="7">7 AM</option><option value="8">8 AM</option>
+                                <option value="9">9 AM</option><option value="10">10 AM</option><option value="11">11 AM</option>
+                                <option value="12">12 PM</option><option value="13">1 PM</option><option value="14">2 PM</option>
+                                <option value="15">3 PM</option><option value="16">4 PM</option><option value="17">5 PM</option>
+                                <option value="18">6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option>
+                                <option value="21">9 PM</option><option value="22">10 PM</option><option value="23">11 PM</option>
+                            </select>
+                            <span style="font-size:0.85rem;">to</span>
+                            <select id="siteOverspillEnd" style="width:auto; min-width:90px; margin:0; padding:0.3rem;">
+                                <option value="-1">Off</option>
+                                <option value="0">12 AM</option><option value="1">1 AM</option><option value="2">2 AM</option>
+                                <option value="3">3 AM</option><option value="4">4 AM</option><option value="5">5 AM</option>
+                                <option value="6">6 AM</option><option value="7">7 AM</option><option value="8">8 AM</option>
+                                <option value="9">9 AM</option><option value="10">10 AM</option><option value="11">11 AM</option>
+                                <option value="12">12 PM</option><option value="13">1 PM</option><option value="14">2 PM</option>
+                                <option value="15">3 PM</option><option value="16">4 PM</option><option value="17">5 PM</option>
+                                <option value="18">6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option>
+                                <option value="21">9 PM</option><option value="22">10 PM</option><option value="23">11 PM</option>
+                            </select>
+                        </div>
+                        <small style="display:block; margin-top:-0.5rem; margin-bottom:0.75rem; color:var(--muted-color);">Set a daily time window, or leave "Off" to use the toggle above 24/7.</small>
                         
                         <div class="pref-row">
                             <label for="siteDefaultPreload">Default sign-in to Pre-Load</label>
                             <input type="checkbox" id="siteDefaultPreload" role="switch">
                         </div>
-                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.75rem; color:var(--muted-color);">Pre-Load checkbox will be pre-checked for all drivers.</small>
+                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.5rem; color:var(--muted-color);">Pre-Load checkbox will be pre-checked for all drivers.</small>
+                        
+                        <div id="preloadScheduleRow" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; padding-left:0.5rem;">
+                            <label style="font-size:0.85rem; margin:0; white-space:nowrap;">⏰ Schedule:</label>
+                            <select id="sitePreloadStart" style="width:auto; min-width:90px; margin:0; padding:0.3rem;">
+                                <option value="-1">Off</option>
+                                <option value="0">12 AM</option><option value="1">1 AM</option><option value="2">2 AM</option>
+                                <option value="3">3 AM</option><option value="4">4 AM</option><option value="5">5 AM</option>
+                                <option value="6">6 AM</option><option value="7">7 AM</option><option value="8">8 AM</option>
+                                <option value="9">9 AM</option><option value="10">10 AM</option><option value="11">11 AM</option>
+                                <option value="12">12 PM</option><option value="13">1 PM</option><option value="14">2 PM</option>
+                                <option value="15">3 PM</option><option value="16">4 PM</option><option value="17">5 PM</option>
+                                <option value="18">6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option>
+                                <option value="21">9 PM</option><option value="22">10 PM</option><option value="23">11 PM</option>
+                            </select>
+                            <span style="font-size:0.85rem;">to</span>
+                            <select id="sitePreloadEnd" style="width:auto; min-width:90px; margin:0; padding:0.3rem;">
+                                <option value="-1">Off</option>
+                                <option value="0">12 AM</option><option value="1">1 AM</option><option value="2">2 AM</option>
+                                <option value="3">3 AM</option><option value="4">4 AM</option><option value="5">5 AM</option>
+                                <option value="6">6 AM</option><option value="7">7 AM</option><option value="8">8 AM</option>
+                                <option value="9">9 AM</option><option value="10">10 AM</option><option value="11">11 AM</option>
+                                <option value="12">12 PM</option><option value="13">1 PM</option><option value="14">2 PM</option>
+                                <option value="15">3 PM</option><option value="16">4 PM</option><option value="17">5 PM</option>
+                                <option value="18">6 PM</option><option value="19">7 PM</option><option value="20">8 PM</option>
+                                <option value="21">9 PM</option><option value="22">10 PM</option><option value="23">11 PM</option>
+                            </select>
+                        </div>
+                        <small style="display:block; margin-top:-0.5rem; margin-bottom:0.75rem; color:var(--muted-color);">Set a daily time window, or leave "Off" to use the toggle above 24/7.</small>
                         
                         <div class="pref-row">
                             <label for="siteDriverCanReportFaults">Drivers can report EPJ faults</label>
@@ -2241,7 +2297,11 @@
                                 siteMorningEnd: 'morningModeEndHour',
                                 siteMaxCheckoutHours: 'maxCheckoutHours',
                                 siteAutoExpire: 'autoExpireMinutes',
-                                siteSiteMessage: 'siteMessage'
+                                siteSiteMessage: 'siteMessage',
+                                siteOverspillStart: 'overspillStartHour',
+                                siteOverspillEnd: 'overspillEndHour',
+                                sitePreloadStart: 'preloadStartHour',
+                                sitePreloadEnd: 'preloadEndHour'
                             };
                             Object.keys(map).forEach(function(elId) {
                                 var el = document.getElementById(elId);
@@ -2271,6 +2331,10 @@
                         settings: {
                             defaultOverspill: document.getElementById('siteDefaultOverspill').checked,
                             defaultPreload: document.getElementById('siteDefaultPreload').checked,
+                            overspillStartHour: parseInt(document.getElementById('siteOverspillStart').value, 10),
+                            overspillEndHour: parseInt(document.getElementById('siteOverspillEnd').value, 10),
+                            preloadStartHour: parseInt(document.getElementById('sitePreloadStart').value, 10),
+                            preloadEndHour: parseInt(document.getElementById('sitePreloadEnd').value, 10),
                             driverCanReportFaults: document.getElementById('siteDriverCanReportFaults').checked,
                             showCarrierColumn: document.getElementById('siteShowCarrierColumn').checked,
                             morningModeStartHour: parseInt(document.getElementById('siteMorningStart').value, 10),
@@ -2302,7 +2366,7 @@
                         window.dashboardRefreshTimer = null;
                     }
                     if (_notifPrefs.autoRefresh > 0) {
-                        window.dashboardRefreshTimer = setInterval(safeCall(refreshDashboard, 'refreshDashboard'), _notifPrefs.autoRefresh * 1000);
+                        window.dashboardRefreshTimer = setInterval(safeCall(loadDashboardData, 'dashboardRefresh'), _notifPrefs.autoRefresh * 1000);
                     }
                 }
                 

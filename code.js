@@ -1152,6 +1152,10 @@ function getCheckoutFormData(data) {
     siteSettings: {
       defaultOverspill: siteSettings.defaultOverspill,
       defaultPreload: siteSettings.defaultPreload,
+      overspillStartHour: siteSettings.overspillStartHour,
+      overspillEndHour: siteSettings.overspillEndHour,
+      preloadStartHour: siteSettings.preloadStartHour,
+      preloadEndHour: siteSettings.preloadEndHour,
       morningModeStartHour: siteSettings.morningModeStartHour,
       morningModeEndHour: siteSettings.morningModeEndHour,
       driverCanReportFaults: siteSettings.driverCanReportFaults,
@@ -2363,6 +2367,10 @@ function exportCheckoutDataCsv(data) {
 const DEFAULT_SITE_SETTINGS = {
   defaultOverspill: false,           // Default the checkout form to overspill mode
   defaultPreload: false,             // Default the checkout form to pre-load mode
+  overspillStartHour: -1,            // Overspill schedule start hour (24h, -1 = disabled)
+  overspillEndHour: -1,              // Overspill schedule end hour (24h, -1 = disabled)
+  preloadStartHour: -1,              // Pre-load schedule start hour (24h, -1 = disabled)
+  preloadEndHour: -1,                // Pre-load schedule end hour (24h, -1 = disabled)
   requireFaultReport: false,         // Require fault report on check-in
   autoExpireMinutes: 60,             // Auto-expire overspill trips after N minutes
   morningModeStartHour: 6,           // Morning mode start hour (24h)
