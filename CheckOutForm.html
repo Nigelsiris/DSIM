@@ -475,6 +475,45 @@
 
                     // Initialize EPJ list
                     updateEpjList();
+                    
+                    // Apply site-wide defaults from admin settings
+                    if (data.siteSettings) {
+                        var ss = data.siteSettings;
+                        // Default overspill toggle
+                        if (ss.defaultOverspill && overspillCheckbox && !overspillCheckbox.checked) {
+                            overspillCheckbox.checked = true;
+                            overspillCheckbox.dispatchEvent(new Event('change'));
+                        }
+                        // Default preload toggle
+                        if (ss.defaultPreload && preloadCheckbox && !preloadCheckbox.checked) {
+                            preloadCheckbox.checked = true;
+                            preloadCheckbox.dispatchEvent(new Event('change'));
+                        }
+                        // Update morning mode hours from config
+                        if (ss.morningModeStartHour != null && ss.morningModeEndHour != null) {
+                            var h = new Date().getHours();
+                            _isMorningMode = (h >= ss.morningModeStartHour && h < ss.morningModeEndHour);
+                            var banner = document.getElementById('morningModeBanner');
+                            if (banner) banner.style.display = _isMorningMode ? 'flex' : 'none';
+                            if (_isMorningMode) {
+                                _availableEpjsData = _allEpjsData;
+                            } else {
+                                _availableEpjsData = _allEpjsData.filter(function(item) { return !item.storeOnly; });
+                            }
+                            updateEpjList();
+                        }
+                        // Show site message banner if set
+                        if (ss.siteMessage) {
+                            var msgBanner = document.createElement('div');
+                            msgBanner.className = 'announcement-banner priority-important';
+                            msgBanner.innerHTML = '<span class="announcement-icon">📢</span><div class="announcement-content"><p class="announcement-message">' + escapeHtmlCheckout(ss.siteMessage) + '</p></div>';
+                            var announcementsContainer = document.getElementById('announcementsContainer');
+                            if (announcementsContainer) {
+                                announcementsContainer.prepend(msgBanner);
+                                announcementsContainer.style.display = 'block';
+                            }
+                        }
+                    }
                 })
                 .withFailureHandler(function(error) {
                     var feedback = document.getElementById('feedback');
@@ -656,16 +695,8 @@
                     if (feedback) feedback.innerText = '';
                     alert(message);
                 } else {
-                    var article = document.querySelector('article');
-                    if (article) {
-                        article.innerHTML = 
-                            '<h2>Success!</h2>' +
-                            '<p>' + message + '</p>' +
-                            '<p>Returning to login screen...</p>';
-                    }
-                    setTimeout(function() {
-                        if (typeof logout === 'function') logout();
-                    }, 2000);
+                    // Instant redirect — no 2-second wait
+                    if (typeof logout === 'function') logout();
                 }
             }
             

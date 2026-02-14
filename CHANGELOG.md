@@ -1,5 +1,76 @@
 # Changelog
 
+## February 7, 2026
+
+### Performance Improvements
+
+#### Batch Spreadsheet Operations
+- **New `adminBatchMaintenanceStatus()`**: Processes multiple EPJ status changes in a single API call
+- **10x faster bulk operations**: Uses `setValues()` instead of individual `appendRow()` calls
+- **Less server load**: Single transaction for all selected EPJs
+
+#### Lazy Loading for Tabs
+- **Fleet Management tab**: Content loads only when tab is first accessed
+- **Maintenance tab**: EPJ grid loads on-demand
+- **Reports tab**: Data fetched when tab is viewed
+- **Announcements tab**: Loads independently of initial page load
+- **Result**: Faster initial page load, better perceived performance
+
+### New Features
+
+#### Dashboard Metrics Cards
+- **5 real-time metrics**: Available, Checked Out, Maintenance, Total EPJs, Utilization %
+- **Auto-updating**: Metrics refresh every minute with live data
+- **Color-coded**: Green (available), Blue (checked out), Orange (maintenance)
+- **Utilization percentage**: Shows what percentage of fleet is actively in use
+
+#### Browser Notification System
+- **Push notifications**: Get alerts even when Admin Dashboard tab is in the background
+- **Permission handling**: Graceful request for notification permission
+- **Per-user preferences**: Enable/disable via Settings tab
+- **Notification types**: Different styling for checkouts vs swaps
+- **Test button**: Verify notifications are working
+- **Automatic integration**: Hooks into existing checkout/swap detection
+
+### Major Feature: Maintenance Mode Overhaul
+
+Complete redesign of the Maintenance tab in the Admin Dashboard for improved usability.
+
+#### New Visual EPJ Grid
+- **Click-to-select interface**: EPJs displayed as cards that can be clicked to select
+- **Visual status indicators**: 
+  - Orange border/background for EPJs in maintenance
+  - Green border for available EPJs
+  - Red border (grayed out) for checked-out EPJs
+- **Grouped sections**: EPJs automatically sorted into "In Maintenance", "Available", and "Checked Out" sections
+- **Checkbox multi-select**: Each card has a checkbox for quick selection
+
+#### Bulk Actions
+- **Select All Visible**: Select all EPJs matching the current filter
+- **Clear Selection**: Deselect all EPJs at once
+- **Put in Maintenance**: Bulk action to take multiple EPJs out of service
+- **Return to Service**: Bulk action to return multiple EPJs to active duty
+- **Filter dropdown**: Filter view by status (All, In Maintenance, Available, Checked Out)
+
+#### Maintenance Action Modal
+- **Reason field**: Required when putting EPJs in maintenance
+- **Resolution notes field**: Track what was fixed when returning EPJs to service
+- **Visual EPJ list**: Shows all selected EPJs before confirming action
+- **Real-time feedback**: Success/error messages during bulk operations
+
+#### Enhanced Maintenance History
+- **EPJ filter**: Filter history by specific EPJ
+- **Event type filter**: Filter by "Started Maintenance" or "Returned to Service"  
+- **Date range filters**: Filter by start and end dates
+- **Clear filters button**: Reset all filters at once
+- **Resolution notes column**: Now displays what was fixed
+
+#### Backend Changes
+- `adminSetMaintenanceStatus()`: Updated to accept resolution notes
+- `getMaintenanceHistory()`: New function to fetch maintenance log with filtering support
+
+---
+
 ## February 1, 2026
 
 ### New Features

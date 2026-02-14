@@ -152,6 +152,65 @@
                 to { transform: rotate(360deg); }
             }
             
+            /* Dashboard Metrics Cards */
+            .metrics-row {
+                display: flex;
+                gap: 1rem;
+                margin-bottom: 1rem;
+                flex-wrap: wrap;
+            }
+            .metric-card {
+                flex: 1;
+                min-width: 120px;
+                padding: 1rem;
+                border-radius: 12px;
+                text-align: center;
+                background: var(--card-background-color);
+                border: 2px solid var(--muted-border-color);
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .metric-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            .metric-card .metric-value {
+                font-size: 2rem;
+                font-weight: 700;
+                line-height: 1.2;
+            }
+            .metric-card .metric-label {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                opacity: 0.8;
+                margin-top: 0.25rem;
+            }
+            .metric-card.available {
+                border-color: #4caf50;
+                background: rgba(76, 175, 80, 0.1);
+            }
+            .metric-card.available .metric-value { color: #4caf50; }
+            .metric-card.checked-out {
+                border-color: #f44336;
+                background: rgba(244, 67, 54, 0.1);
+            }
+            .metric-card.checked-out .metric-value { color: #f44336; }
+            .metric-card.maintenance {
+                border-color: #ff9800;
+                background: rgba(255, 152, 0, 0.1);
+            }
+            .metric-card.maintenance .metric-value { color: #ff9800; }
+            .metric-card.total {
+                border-color: #2196f3;
+                background: rgba(33, 150, 243, 0.1);
+            }
+            .metric-card.total .metric-value { color: #2196f3; }
+            .metric-card.utilization {
+                border-color: #9c27b0;
+                background: rgba(156, 39, 176, 0.1);
+            }
+            .metric-card.utilization .metric-value { color: #9c27b0; }
+
             /* EPJ Swap Modal */
             .modal-overlay {
                 position: fixed;
@@ -164,21 +223,37 @@
                 justify-content: center;
                 align-items: center;
                 z-index: 3000;
+                opacity: 0;
+                transition: opacity 0.2s ease;
             }
             
             .modal-overlay.active {
                 display: flex;
+                opacity: 1;
+                animation: modalBgIn 0.2s ease forwards;
+            }
+            
+            @keyframes modalBgIn {
+                from { opacity: 0; }
+                to   { opacity: 1; }
             }
             
             .modal-content {
                 background: var(--card-background-color);
                 padding: 2rem;
-                border-radius: 0.5rem;
+                border-radius: 0.75rem;
                 max-width: 500px;
                 width: 90%;
                 max-height: 90vh;
                 overflow-y: auto;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+                transform: scale(0.95) translateY(10px);
+                animation: modalSlideIn 0.25s ease forwards;
+            }
+            
+            @keyframes modalSlideIn {
+                from { transform: scale(0.95) translateY(10px); opacity: 0; }
+                to   { transform: scale(1) translateY(0); opacity: 1; }
             }
             
             .modal-header {
@@ -329,6 +404,139 @@
                 background: rgba(255, 152, 0, 0.08);
             }
             
+            /* Maintenance Grid Styles */
+            .maint-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+            .maint-card {
+                padding: 0.75rem;
+                border-radius: 8px;
+                border: 2px solid var(--muted-border-color);
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.2s;
+                position: relative;
+                user-select: none;
+                min-width: 0;
+            }
+            .maint-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+            .maint-card.selected {
+                border-color: var(--primary);
+                background: rgba(33, 150, 243, 0.1);
+            }
+            .maint-card.in-maintenance {
+                border-color: #ff9800;
+                background: rgba(255, 152, 0, 0.15);
+            }
+            .maint-card.in-maintenance .maint-status {
+                color: #ff9800;
+            }
+            .maint-card.available {
+                border-color: #4caf50;
+            }
+            .maint-card.available .maint-status {
+                color: #4caf50;
+            }
+            .maint-card.checked-out {
+                border-color: #f44336;
+                opacity: 0.6;
+            }
+            .maint-card.checked-out .maint-status {
+                color: #f44336;
+            }
+            .maint-card .maint-epj-name {
+                font-weight: 600;
+                font-size: 1rem;
+                margin-bottom: 0.25rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .maint-card .maint-status {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                white-space: nowrap;
+            }
+            .maint-card .maint-checkbox {
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                width: 18px;
+                height: 18px;
+                opacity: 0;
+                transition: opacity 0.2s;
+            }
+            .maint-card:hover .maint-checkbox,
+            .maint-card.selected .maint-checkbox {
+                opacity: 1;
+            }
+            .maint-toolbar {
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                align-items: center;
+                margin-bottom: 1rem;
+                padding: 0.75rem;
+                background: var(--card-background-color);
+                border-radius: 8px;
+                border: 1px solid var(--muted-border-color);
+            }
+            .maint-toolbar .filter-group {
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+            }
+            .maint-toolbar select,
+            .maint-toolbar input {
+                margin-bottom: 0;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.85rem;
+            }
+            .maint-toolbar .btn-group {
+                display: flex;
+                gap: 0.5rem;
+                margin-left: auto;
+            }
+            .maint-toolbar button {
+                padding: 0.5rem 1rem;
+                font-size: 0.85rem;
+                margin-bottom: 0;
+            }
+            .maint-selected-count {
+                font-size: 0.85rem;
+                color: var(--primary);
+                font-weight: 500;
+            }
+            .maint-section-title {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: var(--muted-color);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin: 1rem 0 0.5rem 0;
+                padding-bottom: 0.25rem;
+                border-bottom: 1px solid var(--muted-border-color);
+            }
+            .maint-history-filters {
+                display: flex;
+                gap: 0.75rem;
+                flex-wrap: wrap;
+                margin-bottom: 1rem;
+            }
+            .maint-history-filters select,
+            .maint-history-filters input {
+                margin-bottom: 0;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.85rem;
+                min-width: 140px;
+            }
+            
             /* Tab Navigation */
             .tab-nav {
                 display: flex;
@@ -360,9 +568,19 @@
             }
             .tab-content {
                 display: none;
+                opacity: 0;
+                transform: translateY(6px);
+                transition: opacity 0.25s ease, transform 0.25s ease;
             }
             .tab-content.active {
                 display: block;
+                opacity: 1;
+                transform: translateY(0);
+                animation: tabFadeIn 0.25s ease forwards;
+            }
+            @keyframes tabFadeIn {
+                from { opacity: 0; transform: translateY(6px); }
+                to   { opacity: 1; transform: translateY(0); }
             }
             
             /* Tooltips */
@@ -738,6 +956,30 @@
             
             <!-- Tab: EPJ Status -->
             <div id="tab-epj-status" class="tab-content active">
+                <!-- Quick Metrics Cards -->
+                <div class="metrics-row" id="metricsRow">
+                    <div class="metric-card available">
+                        <div class="metric-value" id="metricAvailable">-</div>
+                        <div class="metric-label">Available</div>
+                    </div>
+                    <div class="metric-card checked-out">
+                        <div class="metric-value" id="metricCheckedOut">-</div>
+                        <div class="metric-label">Checked Out</div>
+                    </div>
+                    <div class="metric-card maintenance">
+                        <div class="metric-value" id="metricMaintenance">-</div>
+                        <div class="metric-label">In Maintenance</div>
+                    </div>
+                    <div class="metric-card total">
+                        <div class="metric-value" id="metricTotal">-</div>
+                        <div class="metric-label">Total Fleet</div>
+                    </div>
+                    <div class="metric-card utilization">
+                        <div class="metric-value" id="metricUtilization">-</div>
+                        <div class="metric-label">Utilization</div>
+                    </div>
+                </div>
+                
                 <article>
                     <h3 style="text-align:center;">EPJ Management <small>(Right-click for quick actions)</small></h3>
                     <div id="statusGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 10px;"></div>
@@ -796,35 +1038,113 @@
             <!-- Tab: Maintenance -->
             <div id="tab-maintenance" class="tab-content">
                 <article>
-                    <h3><ins>Maintenance Mode</ins></h3>
-                    <div class="grid">
-                        <div>
-                            <label>Select EPJ</label>
-                            <select id="maintenanceEpj"></select>
-                        </div>
-                        <div>
-                            <label>Reason (optional)</label>
-                            <input type="text" id="maintenanceReason" placeholder="Reason for maintenance">
-                        </div>
-                        <div>
-                            <label>Action</label>
-                            <select id="maintenanceAction">
-                                <option value="Maintenance Start">Put IN Maintenance</option>
-                                <option value="Maintenance End">Return FROM Maintenance</option>
+                    <h3 style="margin-bottom: 0.5rem;"><ins>🔧 EPJ Maintenance Manager</ins></h3>
+                    <p style="color: var(--muted-color); font-size: 0.9rem; margin-bottom: 1rem;">
+                        Click on EPJ cards to select them, then use the action buttons. EPJs in maintenance are highlighted in orange.
+                    </p>
+                    
+                    <!-- Toolbar -->
+                    <div class="maint-toolbar">
+                        <div class="filter-group">
+                            <label style="margin:0; font-size:0.85rem;">Filter:</label>
+                            <select id="maintFilterStatus" onchange="filterMaintenanceGrid()">
+                                <option value="all">All EPJs</option>
+                                <option value="maintenance">In Maintenance</option>
+                                <option value="available">Available</option>
+                                <option value="checked-out">Checked Out</option>
                             </select>
                         </div>
+                        <span class="maint-selected-count" id="maintSelectedCount">0 selected</span>
+                        <div class="btn-group">
+                            <button class="outline secondary" onclick="selectAllMaintCards()">Select All Visible</button>
+                            <button class="outline secondary" onclick="clearMaintSelection()">Clear</button>
+                            <button class="contrast" onclick="openMaintModal('start')" id="bulkMaintStartBtn" disabled>
+                                🔧 Put in Maintenance
+                            </button>
+                            <button onclick="openMaintModal('end')" id="bulkMaintEndBtn" disabled>
+                                ✓ Return to Service
+                            </button>
+                        </div>
                     </div>
-                    <button id="maintenanceBtn" onclick="setMaintenance()"><span>Update Status</span></button>
+                    
+                    <!-- EPJs Currently in Maintenance -->
+                    <div id="maintInMaintenanceSection" style="display:none;">
+                        <div class="maint-section-title">⚠️ Currently in Maintenance</div>
+                        <div class="maint-grid" id="maintInMaintenanceGrid"></div>
+                    </div>
+                    
+                    <!-- Available EPJs -->
+                    <div id="maintAvailableSection">
+                        <div class="maint-section-title">Available EPJs</div>
+                        <div class="maint-grid" id="maintAvailableGrid"></div>
+                    </div>
+                    
+                    <!-- Checked Out EPJs -->
+                    <div id="maintCheckedOutSection" style="display:none;">
+                        <div class="maint-section-title">Checked Out (Cannot Modify)</div>
+                        <div class="maint-grid" id="maintCheckedOutGrid"></div>
+                    </div>
                 </article>
+                
                 <article>
-                    <h3><ins>Recent Maintenance Events</ins></h3>
+                    <h3><ins>📋 Maintenance History</ins></h3>
+                    <div class="maint-history-filters">
+                        <select id="historyEpjFilter" onchange="filterMaintenanceHistory()">
+                            <option value="">All EPJs</option>
+                        </select>
+                        <select id="historyEventFilter" onchange="filterMaintenanceHistory()">
+                            <option value="">All Events</option>
+                            <option value="Maintenance Start">Started Maintenance</option>
+                            <option value="Maintenance End">Returned to Service</option>
+                        </select>
+                        <input type="date" id="historyDateFrom" onchange="filterMaintenanceHistory()" placeholder="From Date">
+                        <input type="date" id="historyDateTo" onchange="filterMaintenanceHistory()" placeholder="To Date">
+                        <button class="outline secondary" onclick="clearHistoryFilters()" style="padding:0.4rem 0.8rem;">Clear Filters</button>
+                    </div>
                     <div class="overflow-auto">
                         <table id="maintenanceTable">
-                            <thead><tr><th>Timestamp</th><th>EPJ</th><th>Event</th><th>Reason</th><th>Resolution</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>EPJ</th>
+                                    <th>Event</th>
+                                    <th>Reason</th>
+                                    <th>Resolution Notes</th>
+                                </tr>
+                            </thead>
                             <tbody></tbody>
                         </table>
                     </div>
                 </article>
+            </div>
+            
+            <!-- Maintenance Action Modal -->
+            <div id="maintActionModal" class="modal-overlay">
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h3 id="maintModalTitle">Maintenance Action</h3>
+                        <button class="modal-close" onclick="closeMaintModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="maintModalDescription"></p>
+                        <div id="maintModalEpjList" style="margin: 1rem 0; padding: 0.75rem; background: var(--card-sectionning-background-color); border-radius: 8px; max-height: 150px; overflow-y: auto;"></div>
+                        
+                        <div id="maintReasonSection">
+                            <label for="maintReasonInput">Reason for Maintenance</label>
+                            <input type="text" id="maintReasonInput" placeholder="e.g., Battery replacement, wheel repair...">
+                        </div>
+                        
+                        <div id="maintResolutionSection" style="display:none;">
+                            <label for="maintResolutionInput">Resolution Notes (what was fixed?)</label>
+                            <textarea id="maintResolutionInput" placeholder="e.g., Replaced battery, repaired hydraulic system..." rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="outline secondary" onclick="closeMaintModal()">Cancel</button>
+                        <button id="maintModalConfirmBtn" onclick="executeMaintAction()">Confirm</button>
+                    </div>
+                    <p id="maintModalFeedback" style="text-align:center; margin-top:0.5rem;"></p>
+                </div>
             </div>
             
             <!-- Tab: Fleet Management -->
@@ -965,6 +1285,51 @@
                             <span>📥 Download CSV Export</span>
                         </button>
                     </div>
+                    
+                    <!-- Driver Statistics Section -->
+                    <div class="notification-prefs" style="max-width:100%; margin-top:1rem;">
+                        <h4>👤 Driver Statistics</h4>
+                        <div class="grid" style="grid-template-columns: 1fr auto; align-items: end; gap: 0.5rem;">
+                            <div>
+                                <label for="driverStatsDays">Time Period</label>
+                                <select id="driverStatsDays" onchange="loadDriverStatistics()">
+                                    <option value="7">Last 7 days</option>
+                                    <option value="14">Last 14 days</option>
+                                    <option value="30" selected>Last 30 days</option>
+                                    <option value="90">Last 90 days</option>
+                                </select>
+                            </div>
+                            <button class="outline secondary" onclick="loadDriverStatistics()" style="height:fit-content;">
+                                ⟳
+                            </button>
+                        </div>
+                        
+                        <!-- Summary Stats -->
+                        <div id="driverStatsSummary" style="margin-top:1rem;">
+                            <div class="grid" style="gap:0.5rem; text-align:center;">
+                                <div style="background:var(--card-background-color); padding:0.75rem; border-radius:8px; border:1px solid var(--muted-border-color);">
+                                    <div style="font-size:1.5rem; font-weight:bold; color:var(--primary);" id="statsTotalTrips">-</div>
+                                    <div style="font-size:0.75rem; color:var(--muted-color);">Total Trips</div>
+                                </div>
+                                <div style="background:var(--card-background-color); padding:0.75rem; border-radius:8px; border:1px solid var(--muted-border-color);">
+                                    <div style="font-size:1.5rem; font-weight:bold; color:#4caf50;" id="statsAvgTrip">-</div>
+                                    <div style="font-size:0.75rem; color:var(--muted-color);">Avg Trip Time</div>
+                                </div>
+                                <div style="background:var(--card-background-color); padding:0.75rem; border-radius:8px; border:1px solid var(--muted-border-color);">
+                                    <div style="font-size:1.5rem; font-weight:bold; color:#2196f3;" id="statsPeakDay">-</div>
+                                    <div style="font-size:0.75rem; color:var(--muted-color);">Busiest Day</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Drivers List -->
+                        <div style="margin-top:1rem;">
+                            <h5 style="margin-bottom:0.5rem; color:var(--muted-color); font-size:0.9rem;">🏆 Top 10 Most Active Drivers</h5>
+                            <div id="topDriversList" style="max-height:300px; overflow-y:auto;">
+                                <p style="text-align:center; color:var(--muted-color);">Loading driver statistics...</p>
+                            </div>
+                        </div>
+                    </div>
                 </article>
             </div>
 
@@ -982,9 +1347,86 @@
                 <article>
                     <h3 style="text-align:center;">⚙️ Dashboard Settings</h3>
                     
+                    <!-- Site Configuration (Admin Only - saved to sheet) -->
+                    <div class="notification-prefs" id="siteConfigPanel">
+                        <h4>🔧 Site Configuration</h4>
+                        <p style="font-size:0.8rem; color:var(--muted-color); margin-top:-0.5rem; margin-bottom:1rem;">
+                            These settings apply site-wide and are shared across all users.
+                        </p>
+                        
+                        <div class="pref-row">
+                            <label for="siteDefaultOverspill">Default sign-in to Overspill</label>
+                            <input type="checkbox" id="siteDefaultOverspill" role="switch">
+                        </div>
+                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.75rem; color:var(--muted-color);">Overspill checkbox will be pre-checked for all drivers.</small>
+                        
+                        <div class="pref-row">
+                            <label for="siteDefaultPreload">Default sign-in to Pre-Load</label>
+                            <input type="checkbox" id="siteDefaultPreload" role="switch">
+                        </div>
+                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.75rem; color:var(--muted-color);">Pre-Load checkbox will be pre-checked for all drivers.</small>
+                        
+                        <div class="pref-row">
+                            <label for="siteDriverCanReportFaults">Drivers can report EPJ faults</label>
+                            <input type="checkbox" id="siteDriverCanReportFaults" role="switch" checked>
+                        </div>
+                        <small style="display:block; margin-top:-0.75rem; margin-bottom:0.75rem; color:var(--muted-color);">Allow drivers to report issues during EPJ swap.</small>
+                        
+                        <div class="pref-row">
+                            <label for="siteShowCarrierColumn">Show Carrier column in Live Checkouts</label>
+                            <input type="checkbox" id="siteShowCarrierColumn" role="switch" checked>
+                        </div>
+                        
+                        <hr style="margin:1rem 0;">
+                        
+                        <div class="pref-row">
+                            <label for="siteMorningStart">Morning mode start hour</label>
+                            <select id="siteMorningStart" style="width:auto; min-width:80px;">
+                                <option value="4">4 AM</option>
+                                <option value="5">5 AM</option>
+                                <option value="6" selected>6 AM</option>
+                                <option value="7">7 AM</option>
+                                <option value="8">8 AM</option>
+                            </select>
+                        </div>
+                        
+                        <div class="pref-row">
+                            <label for="siteMorningEnd">Morning mode end hour</label>
+                            <select id="siteMorningEnd" style="width:auto; min-width:80px;">
+                                <option value="9">9 AM</option>
+                                <option value="10">10 AM</option>
+                                <option value="11">11 AM</option>
+                                <option value="12" selected>12 PM</option>
+                                <option value="13">1 PM</option>
+                                <option value="14">2 PM</option>
+                            </select>
+                        </div>
+                        
+                        <div class="pref-row">
+                            <label for="siteMaxCheckoutHours">Max checkout hours before alert</label>
+                            <input type="number" id="siteMaxCheckoutHours" value="24" min="1" max="72" style="width:80px;">
+                        </div>
+                        
+                        <div class="pref-row">
+                            <label for="siteAutoExpire">Auto-expire checkout (minutes, 0 = off)</label>
+                            <input type="number" id="siteAutoExpire" value="60" min="0" max="480" style="width:80px;">
+                        </div>
+                        
+                        <hr style="margin:1rem 0;">
+                        
+                        <label for="siteSiteMessage">Site-wide banner message</label>
+                        <input type="text" id="siteSiteMessage" placeholder="Leave blank for no message" style="margin-bottom:0.5rem;">
+                        <small style="display:block; margin-bottom:1rem; color:var(--muted-color);">Shown to all drivers on the checkout page.</small>
+                        
+                        <div style="display:flex; gap:0.5rem; align-items:center;">
+                            <button onclick="saveSiteConfig()" id="saveSiteConfigBtn" style="flex:1;"><span>💾 Save Site Configuration</span></button>
+                            <span id="siteConfigStatus" style="font-size:0.85rem; white-space:nowrap;"></span>
+                        </div>
+                    </div>
+                    
                     <!-- Sound Settings -->
                     <div class="notification-prefs">
-                        <h4>🔔 Sound & Notification Settings</h4>
+                        <h4>🔊 Sound Settings</h4>
                         <div class="pref-row">
                             <label for="prefSoundEnabled">Enable notification sounds</label>
                             <input type="checkbox" id="prefSoundEnabled" checked role="switch">
@@ -1425,6 +1867,27 @@
                     _consecutiveErrors = 0;
                 }
                 
+                // ── Speed: pause polling when tab is hidden ──────────────
+                document.addEventListener('visibilitychange', function() {
+                    if (document.hidden) {
+                        stopAllTimers();
+                    } else {
+                        // Resume polling when tab becomes visible again
+                        if (!_isRefreshing && _token) {
+                            refreshLiveCheckouts(false);
+                            restartAutoRefresh();
+                            if (!window.loginCheckTimer) {
+                                window.loginCheckTimer = setInterval(safeCall(checkForNewDriverLogins, 'loginCheck'), 15000);
+                            }
+                            if (!window.liveCheckoutsTimer) {
+                                window.liveCheckoutsTimer = setInterval(safeCall(function() {
+                                    refreshLiveCheckouts(false);
+                                }, 'liveCheckouts'), 30000);
+                            }
+                        }
+                    }
+                });
+                
                 // Initialize notification sound (simple beep using Web Audio API)
                 function initNotificationSound() {
                     try {
@@ -1757,6 +2220,80 @@
                     };
                     reader.readAsText(file);
                     event.target.value = ''; // Reset for re-import
+                };
+                
+                // ── Site Configuration (server-side settings) ──────────────
+                var _siteConfigLoaded = false;
+                
+                window.loadSiteConfig = function() {
+                    var statusEl = document.getElementById('siteConfigStatus');
+                    if (statusEl) statusEl.textContent = 'Loading…';
+                    
+                    google.script.run
+                        .withSuccessHandler(function(settings) {
+                            _siteConfigLoaded = true;
+                            var map = {
+                                siteDefaultOverspill: 'defaultOverspill',
+                                siteDefaultPreload: 'defaultPreload',
+                                siteDriverCanReportFaults: 'driverCanReportFaults',
+                                siteShowCarrierColumn: 'showCarrierColumn',
+                                siteMorningStart: 'morningModeStartHour',
+                                siteMorningEnd: 'morningModeEndHour',
+                                siteMaxCheckoutHours: 'maxCheckoutHours',
+                                siteAutoExpire: 'autoExpireMinutes',
+                                siteSiteMessage: 'siteMessage'
+                            };
+                            Object.keys(map).forEach(function(elId) {
+                                var el = document.getElementById(elId);
+                                if (!el) return;
+                                var val = settings[map[elId]];
+                                if (el.type === 'checkbox') el.checked = !!val;
+                                else el.value = val != null ? val : '';
+                            });
+                            if (statusEl) { statusEl.style.color = '#4caf50'; statusEl.textContent = '✓ Loaded'; }
+                            setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 2000);
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            if (statusEl) { statusEl.style.color = 'red'; statusEl.textContent = 'Load failed'; }
+                        })
+                        .getSiteSettings({token: _token});
+                };
+                
+                window.saveSiteConfig = function() {
+                    var btn = document.getElementById('saveSiteConfigBtn');
+                    var statusEl = document.getElementById('siteConfigStatus');
+                    if (btn) { btn.disabled = true; btn.classList.add('btn-loading'); }
+                    if (statusEl) statusEl.textContent = 'Saving…';
+                    
+                    var payload = {
+                        token: _token,
+                        settings: {
+                            defaultOverspill: document.getElementById('siteDefaultOverspill').checked,
+                            defaultPreload: document.getElementById('siteDefaultPreload').checked,
+                            driverCanReportFaults: document.getElementById('siteDriverCanReportFaults').checked,
+                            showCarrierColumn: document.getElementById('siteShowCarrierColumn').checked,
+                            morningModeStartHour: parseInt(document.getElementById('siteMorningStart').value, 10),
+                            morningModeEndHour: parseInt(document.getElementById('siteMorningEnd').value, 10),
+                            maxCheckoutHours: parseInt(document.getElementById('siteMaxCheckoutHours').value, 10),
+                            autoExpireMinutes: parseInt(document.getElementById('siteAutoExpire').value, 10),
+                            siteMessage: document.getElementById('siteSiteMessage').value.trim()
+                        }
+                    };
+                    
+                    google.script.run
+                        .withSuccessHandler(function() {
+                            if (btn) { btn.disabled = false; btn.classList.remove('btn-loading'); }
+                            if (statusEl) { statusEl.style.color = '#4caf50'; statusEl.textContent = '✓ Saved!'; }
+                            setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 3000);
+                        })
+                        .withFailureHandler(function(err) {
+                            if (handleSessionError(err)) return;
+                            if (btn) { btn.disabled = false; btn.classList.remove('btn-loading'); }
+                            if (statusEl) { statusEl.style.color = 'red'; statusEl.textContent = 'Save failed'; }
+                            alert('Error saving site config: ' + (err.message || 'Unknown error'));
+                        })
+                        .adminUpdateSiteSettings(payload);
                 };
                 
                 function restartAutoRefresh() {
@@ -2438,6 +2975,24 @@
                         grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛠️</div><h4>No EPJs Configured</h4><p>No EPJs have been added to the system yet. Check the EPJ Status sheet in your spreadsheet.</p></div>';
                     }
                     
+                    // Update metrics cards
+                    if (data.epjStatuses && data.epjStatuses.length > 0) {
+                        var available = 0, checkedOut = 0, maintenance = 0;
+                        data.epjStatuses.forEach(function(item) {
+                            if (item.status === 'Available') available++;
+                            else if (item.status === 'Checked Out') checkedOut++;
+                            else if (item.status === 'Maintenance') maintenance++;
+                        });
+                        var total = data.epjStatuses.length;
+                        var utilization = total > 0 ? Math.round((checkedOut / (total - maintenance)) * 100) : 0;
+                        
+                        document.getElementById('metricAvailable').textContent = available;
+                        document.getElementById('metricCheckedOut').textContent = checkedOut;
+                        document.getElementById('metricMaintenance').textContent = maintenance;
+                        document.getElementById('metricTotal').textContent = total;
+                        document.getElementById('metricUtilization').textContent = (isNaN(utilization) || !isFinite(utilization)) ? '0%' : utilization + '%';
+                    }
+                    
                     var activeTableBody = document.querySelector('#activeCheckoutsTable tbody');
                     if (activeTableBody) {
                         updateLiveCheckoutsTable(data.activeCheckouts);
@@ -2576,6 +3131,24 @@
                         btn.classList.remove('btn-loading');
                         btn.disabled = false;
                     }
+                }
+                
+                // Generic feedback display function
+                function showFeedback(message, color) {
+                    var feedback = document.getElementById('adminFeedback');
+                    if (!feedback) {
+                        // Create a temporary toast notification if no feedback element exists
+                        var toast = document.createElement('div');
+                        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:8px;color:white;font-weight:500;z-index:9999;animation:fadeIn 0.3s;';
+                        toast.style.backgroundColor = color === 'green' ? '#4caf50' : color === 'red' ? '#f44336' : '#2196f3';
+                        toast.textContent = message;
+                        document.body.appendChild(toast);
+                        setTimeout(function() { toast.remove(); }, 3000);
+                        return;
+                    }
+                    feedback.textContent = message;
+                    feedback.style.color = color || '';
+                    setTimeout(function() { feedback.textContent = ''; }, 5000);
                 }
                 
                 function handleSuccessWithBtn(btnId) {
@@ -2759,6 +3332,245 @@
                         .adminAddUser({token: _token, username: username, password: password, role: role, carrier: carrier});
                 };
 
+                // ==================== MAINTENANCE MANAGER ====================
+                
+                var _maintSelectedEpjs = [];
+                var _maintAllEpjData = [];
+                var _maintHistoryData = [];
+                var _maintCurrentAction = null; // 'start' or 'end'
+                
+                window.loadMaintenanceGrid = function() {
+                    // Use the dashboard data that's already loaded
+                    google.script.run
+                        .withSuccessHandler(function(data) {
+                            _maintAllEpjData = data.epjStatuses || [];
+                            renderMaintenanceGrid();
+                            populateHistoryEpjFilter();
+                        })
+                        .withFailureHandler(function(err) {
+                            console.error('Error loading maintenance data:', err);
+                        })
+                        .getDashboardData({token: _token});
+                };
+                
+                function renderMaintenanceGrid() {
+                    var filter = document.getElementById('maintFilterStatus').value;
+                    var inMaintGrid = document.getElementById('maintInMaintenanceGrid');
+                    var availableGrid = document.getElementById('maintAvailableGrid');
+                    var checkedOutGrid = document.getElementById('maintCheckedOutGrid');
+                    var inMaintSection = document.getElementById('maintInMaintenanceSection');
+                    var availableSection = document.getElementById('maintAvailableSection');
+                    var checkedOutSection = document.getElementById('maintCheckedOutSection');
+                    
+                    inMaintGrid.innerHTML = '';
+                    availableGrid.innerHTML = '';
+                    checkedOutGrid.innerHTML = '';
+                    
+                    var inMaintCount = 0, availableCount = 0, checkedOutCount = 0;
+                    
+                    _maintAllEpjData.forEach(function(epj) {
+                        var card = createMaintCard(epj);
+                        var shouldShow = filter === 'all' || 
+                            (filter === 'maintenance' && epj.status === 'Maintenance') ||
+                            (filter === 'available' && epj.status === 'Available') ||
+                            (filter === 'checked-out' && epj.status === 'Checked Out');
+                        
+                        if (!shouldShow) return;
+                        
+                        if (epj.status === 'Maintenance') {
+                            inMaintGrid.appendChild(card);
+                            inMaintCount++;
+                        } else if (epj.status === 'Available') {
+                            availableGrid.appendChild(card);
+                            availableCount++;
+                        } else {
+                            checkedOutGrid.appendChild(card);
+                            checkedOutCount++;
+                        }
+                    });
+                    
+                    // Show/hide sections based on content
+                    inMaintSection.style.display = inMaintCount > 0 ? 'block' : 'none';
+                    availableSection.style.display = availableCount > 0 ? 'block' : 'none';
+                    checkedOutSection.style.display = checkedOutCount > 0 ? 'block' : 'none';
+                    
+                    updateMaintSelectionUI();
+                }
+                
+                function createMaintCard(epj) {
+                    var card = document.createElement('div');
+                    var statusClass = epj.status === 'Maintenance' ? 'in-maintenance' : 
+                                     (epj.status === 'Available' ? 'available' : 'checked-out');
+                    var isSelected = _maintSelectedEpjs.indexOf(epj.epj) > -1;
+                    
+                    card.className = 'maint-card ' + statusClass + (isSelected ? ' selected' : '');
+                    card.dataset.epj = epj.epj;
+                    card.dataset.status = epj.status;
+                    
+                    card.innerHTML = 
+                        '<input type="checkbox" class="maint-checkbox" ' + (isSelected ? 'checked' : '') + ' onclick="event.stopPropagation();">' +
+                        '<div class="maint-epj-name">' + epj.epj + '</div>' +
+                        '<div class="maint-status">' + epj.status + '</div>';
+                    
+                    // Only allow selection of available or in-maintenance EPJs
+                    if (epj.status !== 'Checked Out') {
+                        card.onclick = function(e) {
+                            toggleMaintSelection(epj.epj, card);
+                        };
+                        card.querySelector('.maint-checkbox').onchange = function(e) {
+                            toggleMaintSelection(epj.epj, card);
+                        };
+                    } else {
+                        card.style.cursor = 'not-allowed';
+                        card.querySelector('.maint-checkbox').style.display = 'none';
+                    }
+                    
+                    return card;
+                }
+                
+                function toggleMaintSelection(epjName, card) {
+                    var idx = _maintSelectedEpjs.indexOf(epjName);
+                    if (idx > -1) {
+                        _maintSelectedEpjs.splice(idx, 1);
+                        card.classList.remove('selected');
+                        card.querySelector('.maint-checkbox').checked = false;
+                    } else {
+                        _maintSelectedEpjs.push(epjName);
+                        card.classList.add('selected');
+                        card.querySelector('.maint-checkbox').checked = true;
+                    }
+                    updateMaintSelectionUI();
+                }
+                
+                function updateMaintSelectionUI() {
+                    var count = _maintSelectedEpjs.length;
+                    document.getElementById('maintSelectedCount').textContent = count + ' selected';
+                    document.getElementById('bulkMaintStartBtn').disabled = count === 0;
+                    document.getElementById('bulkMaintEndBtn').disabled = count === 0;
+                }
+                
+                window.filterMaintenanceGrid = function() {
+                    renderMaintenanceGrid();
+                };
+                
+                window.selectAllMaintCards = function() {
+                    var filter = document.getElementById('maintFilterStatus').value;
+                    _maintAllEpjData.forEach(function(epj) {
+                        if (epj.status === 'Checked Out') return;
+                        var shouldSelect = filter === 'all' || 
+                            (filter === 'maintenance' && epj.status === 'Maintenance') ||
+                            (filter === 'available' && epj.status === 'Available');
+                        if (shouldSelect && _maintSelectedEpjs.indexOf(epj.epj) === -1) {
+                            _maintSelectedEpjs.push(epj.epj);
+                        }
+                    });
+                    renderMaintenanceGrid();
+                };
+                
+                window.clearMaintSelection = function() {
+                    _maintSelectedEpjs = [];
+                    renderMaintenanceGrid();
+                };
+                
+                window.openMaintModal = function(action) {
+                    if (_maintSelectedEpjs.length === 0) {
+                        alert('Please select at least one EPJ.');
+                        return;
+                    }
+                    
+                    _maintCurrentAction = action;
+                    var modal = document.getElementById('maintActionModal');
+                    var title = document.getElementById('maintModalTitle');
+                    var desc = document.getElementById('maintModalDescription');
+                    var epjList = document.getElementById('maintModalEpjList');
+                    var reasonSection = document.getElementById('maintReasonSection');
+                    var resolutionSection = document.getElementById('maintResolutionSection');
+                    var confirmBtn = document.getElementById('maintModalConfirmBtn');
+                    
+                    document.getElementById('maintReasonInput').value = '';
+                    document.getElementById('maintResolutionInput').value = '';
+                    document.getElementById('maintModalFeedback').textContent = '';
+                    
+                    if (action === 'start') {
+                        title.textContent = '🔧 Put EPJs in Maintenance';
+                        desc.textContent = 'The following EPJ(s) will be taken out of service for maintenance:';
+                        reasonSection.style.display = 'block';
+                        resolutionSection.style.display = 'none';
+                        confirmBtn.textContent = 'Put in Maintenance';
+                        confirmBtn.className = 'contrast';
+                    } else {
+                        title.textContent = '✓ Return EPJs to Service';
+                        desc.textContent = 'The following EPJ(s) will be returned to active service:';
+                        reasonSection.style.display = 'none';
+                        resolutionSection.style.display = 'block';
+                        confirmBtn.textContent = 'Return to Service';
+                        confirmBtn.className = '';
+                    }
+                    
+                    epjList.innerHTML = _maintSelectedEpjs.map(function(epj) {
+                        return '<span style="display:inline-block;padding:0.25rem 0.5rem;margin:0.25rem;background:var(--muted-border-color);border-radius:4px;font-size:0.9rem;">' + epj + '</span>';
+                    }).join('');
+                    
+                    modal.classList.add('active');
+                };
+                
+                window.closeMaintModal = function() {
+                    document.getElementById('maintActionModal').classList.remove('active');
+                    _maintCurrentAction = null;
+                };
+                
+                window.executeMaintAction = function() {
+                    var reason = document.getElementById('maintReasonInput').value.trim();
+                    var resolution = document.getElementById('maintResolutionInput').value.trim();
+                    var feedback = document.getElementById('maintModalFeedback');
+                    var confirmBtn = document.getElementById('maintModalConfirmBtn');
+                    
+                    if (_maintCurrentAction === 'start' && !reason) {
+                        feedback.textContent = 'Please enter a reason for maintenance.';
+                        feedback.style.color = '#f44336';
+                        return;
+                    }
+                    
+                    setButtonLoading(confirmBtn, true);
+                    feedback.textContent = 'Processing ' + _maintSelectedEpjs.length + ' EPJ(s)...';
+                    feedback.style.color = '';
+                    
+                    var status = _maintCurrentAction === 'start' ? 'Maintenance Start' : 'Maintenance End';
+                    
+                    // Single batch API call instead of individual calls per EPJ
+                    google.script.run
+                        .withSuccessHandler(function(result) {
+                            setButtonLoading(confirmBtn, false);
+                            if (result && result.success) {
+                                feedback.textContent = 'Success! ' + result.count + ' EPJ(s) updated.';
+                                feedback.style.color = '#4caf50';
+                                setTimeout(function() {
+                                    closeMaintModal();
+                                    _maintSelectedEpjs = [];
+                                    loadMaintenanceGrid();
+                                    loadMaintenanceHistory();
+                                    loadDashboardData();
+                                }, 1000);
+                            } else {
+                                feedback.textContent = result.message || 'Update completed.';
+                                feedback.style.color = '#4caf50';
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            setButtonLoading(confirmBtn, false);
+                            feedback.textContent = 'Error: ' + (err.message || 'Unknown error');
+                            feedback.style.color = '#f44336';
+                        })
+                        .adminBatchMaintenanceStatus({
+                            token: _token,
+                            epjs: _maintSelectedEpjs,
+                            status: status,
+                            reason: _maintCurrentAction === 'start' ? reason : '',
+                            resolution: _maintCurrentAction === 'end' ? resolution : ''
+                        });
+                };
+                
+                // Keep old function for backward compatibility (context menu)
                 window.setMaintenance = function() {
                     var epjEl = document.getElementById('maintenanceEpj');
                     var actionEl = document.getElementById('maintenanceAction');
@@ -2773,6 +3585,87 @@
                         .withSuccessHandler(handleSuccessWithBtn('maintenanceBtn'))
                         .withFailureHandler(handleFailureWithBtn('maintenanceBtn'))
                         .adminSetMaintenanceStatus({token: _token, epj: epj, status: action, reason: reason});
+                };
+                
+                // Maintenance History Functions
+                window.loadMaintenanceHistory = function() {
+                    google.script.run
+                        .withSuccessHandler(function(history) {
+                            _maintHistoryData = history || [];
+                            filterMaintenanceHistory();
+                        })
+                        .withFailureHandler(function(err) {
+                            console.error('Error loading maintenance history:', err);
+                        })
+                        .getMaintenanceHistory({token: _token});
+                };
+                
+                function populateHistoryEpjFilter() {
+                    var select = document.getElementById('historyEpjFilter');
+                    var currentVal = select.value;
+                    select.innerHTML = '<option value="">All EPJs</option>';
+                    
+                    var uniqueEpjs = [];
+                    _maintAllEpjData.forEach(function(epj) {
+                        if (uniqueEpjs.indexOf(epj.epj) === -1) {
+                            uniqueEpjs.push(epj.epj);
+                        }
+                    });
+                    uniqueEpjs.sort().forEach(function(epj) {
+                        select.innerHTML += '<option value="' + epj + '">' + epj + '</option>';
+                    });
+                    
+                    if (currentVal) select.value = currentVal;
+                }
+                
+                window.filterMaintenanceHistory = function() {
+                    var epjFilter = document.getElementById('historyEpjFilter').value;
+                    var eventFilter = document.getElementById('historyEventFilter').value;
+                    var dateFrom = document.getElementById('historyDateFrom').value;
+                    var dateTo = document.getElementById('historyDateTo').value;
+                    
+                    var filtered = _maintHistoryData.filter(function(item) {
+                        if (epjFilter && item.epj !== epjFilter) return false;
+                        if (eventFilter && item.event !== eventFilter) return false;
+                        if (dateFrom && new Date(item.timestamp) < new Date(dateFrom)) return false;
+                        if (dateTo) {
+                            var toDate = new Date(dateTo);
+                            toDate.setHours(23, 59, 59, 999);
+                            if (new Date(item.timestamp) > toDate) return false;
+                        }
+                        return true;
+                    });
+                    
+                    renderMaintenanceHistory(filtered);
+                };
+                
+                function renderMaintenanceHistory(data) {
+                    var tbody = document.querySelector('#maintenanceTable tbody');
+                    if (!tbody) return;
+                    
+                    if (!data || data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted-color);">No maintenance records found</td></tr>';
+                        return;
+                    }
+                    
+                    tbody.innerHTML = data.map(function(item) {
+                        var eventClass = item.event === 'Maintenance Start' ? 'color:#ff9800;' : 'color:#4caf50;';
+                        return '<tr>' +
+                            '<td>' + new Date(item.timestamp).toLocaleString() + '</td>' +
+                            '<td><b>' + item.epj + '</b></td>' +
+                            '<td style="' + eventClass + '">' + (item.event === 'Maintenance Start' ? '🔧 Started' : '✓ Returned') + '</td>' +
+                            '<td>' + (item.reason || '-') + '</td>' +
+                            '<td>' + (item.resolution || '-') + '</td>' +
+                        '</tr>';
+                    }).join('');
+                }
+                
+                window.clearHistoryFilters = function() {
+                    document.getElementById('historyEpjFilter').value = '';
+                    document.getElementById('historyEventFilter').value = '';
+                    document.getElementById('historyDateFrom').value = '';
+                    document.getElementById('historyDateTo').value = '';
+                    filterMaintenanceHistory();
                 };
 
                 window.editUser = function(username, currentRole, currentCarrier) {
@@ -2889,8 +3782,7 @@
                         .adminRemoveEpj({token: _token, epjNumber: epjNumber});
                 };
                 
-                // Load EPJ list on page load
-                loadEpjManagementList();
+                // EPJ list loads lazily when fleet tab is clicked (see tab event listeners below)
                 
                 // EPJ Swap Modal Functions
                 var _swapTripId = null;
@@ -3186,7 +4078,7 @@
                             if (handleSessionError(err)) return;
                             container.innerHTML = '<p style="text-align:center; color:#f44336;">Error loading announcements</p>';
                         })
-                        .adminGetAllAnnouncements({token: _token});
+                        .adminGetAnnouncements({token: _token});
                 };
                 
                 window.createAnnouncement = function() {
@@ -3417,6 +4309,22 @@
                 // Initialize announcements when tab is clicked
                 document.querySelector('.tab-btn[data-tab="announcements"]').addEventListener('click', function() {
                     loadAnnouncements();
+                });
+                
+                // Initialize maintenance tab when clicked
+                document.querySelector('.tab-btn[data-tab="maintenance"]').addEventListener('click', function() {
+                    loadMaintenanceGrid();
+                    loadMaintenanceHistory();
+                });
+                
+                // Initialize fleet management tab when clicked
+                document.querySelector('.tab-btn[data-tab="fleet"]').addEventListener('click', function() {
+                    loadEpjManagementList();
+                });
+                
+                // Initialize settings tab - load site config when clicked
+                document.querySelector('.tab-btn[data-tab="settings"]').addEventListener('click', function() {
+                    if (!_siteConfigLoaded) loadSiteConfig();
                 });
                 
                 // Helper function

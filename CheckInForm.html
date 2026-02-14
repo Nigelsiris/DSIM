@@ -191,6 +191,12 @@
             
             <h4>Or Check Out Completely</h4>
             <p style="color: var(--pico-muted-color); font-size:0.9rem;">If you're done for the day and don't need an EPJ:</p>
+            
+            <label for="overspillCheckInZone">Your Current Location</label>
+            <select id="overspillCheckInZone">
+                <?!= zoneOptions || '<option value="Unknown">Unknown Location</option>'; ?>
+            </select>
+            
             <button id="checkInBtn" class="secondary" onclick="doCheckIn()"><span>✓ Complete Check-Out (No EPJ)</span></button>
             <p id="feedback" style="text-align:center; min-height:20px;"></p>
             
@@ -252,7 +258,7 @@
                 
                 <label for="swapIssueReport">Issue with current EPJ? (optional)</label>
                 <textarea id="swapIssueReport" placeholder="e.g., Battery died, forks not lifting properly..."></textarea>
-                <small style="display:block; margin-top:-0.5rem; margin-bottom:1rem; color:var(--pico-muted-color);">If you report an issue, the EPJ will be flagged for maintenance.</small>
+                <small style="display:block; margin-top:-0.5rem; margin-bottom:1rem; color:var(--pico-muted-color);">If you report an issue, it will be noted for admin review.</small>
                 
                 <div class="grid">
                     <button class="secondary" onclick="closeEpjSwapModal()">Cancel</button>
@@ -269,6 +275,7 @@
             var _token = (typeof sessionToken !== 'undefined' && sessionToken) ? sessionToken : "<?= token ?>";
             var _currentEpj = "<?!= currentEpj; ?>";
             var _isOverspill = <?= isOverspill ? 'true' : 'false' ?>;
+            var _checkoutZone = "<?!= checkoutZone || ''; ?>";
             var _epjInfoMap = {};
             var _availableEpjsData = [];
             
@@ -439,16 +446,8 @@
                                 }
                                 alert(message);
                             } else {
-                                var article = document.querySelector('article');
-                                if (article) {
-                                    article.innerHTML = 
-                                        '<h2>Success!</h2>' +
-                                        '<p>' + message + '</p>' +
-                                        '<p>Returning to login screen...</p>';
-                                }
-                                setTimeout(function() {
-                                    if (typeof logout === 'function') logout();
-                                }, 2000);
+                                // Instant redirect
+                                if (typeof logout === 'function') logout();
                             }
                         })
                         .withFailureHandler(function(error) {
@@ -460,7 +459,7 @@
                         })
                         .processCheckIn({
                             token: _token, 
-                            checkInZone: 'Overspill - No EPJ', 
+                            checkInZone: (document.getElementById('overspillCheckInZone') ? document.getElementById('overspillCheckInZone').value : '') || _checkoutZone || 'Unknown', 
                             faultReport: '',
                             pluggedIn: true
                         });
@@ -502,16 +501,8 @@
                             }
                             alert(message);
                         } else {
-                            var article = document.querySelector('article');
-                            if (article) {
-                                article.innerHTML = 
-                                    '<h2>Success!</h2>' +
-                                    '<p>' + message + '</p>' +
-                                    '<p>Returning to login screen...</p>';
-                            }
-                            setTimeout(function() {
-                                if (typeof logout === 'function') logout();
-                            }, 2000);
+                            // Instant redirect
+                            if (typeof logout === 'function') logout();
                         }
                     })
                     .withFailureHandler(function(error) {
@@ -572,16 +563,8 @@
                                 feedback.style.color = 'red';
                             }
                         } else {
-                            var article = document.querySelector('article');
-                            if (article) {
-                                article.innerHTML = 
-                                    '<h2>Success!</h2>' +
-                                    '<p>' + message + '</p>' +
-                                    '<p>Returning to login screen...</p>';
-                            }
-                            setTimeout(function() {
-                                if (typeof logout === 'function') logout();
-                            }, 2000);
+                            // Instant redirect
+                            if (typeof logout === 'function') logout();
                         }
                     })
                     .withFailureHandler(function(err) {
@@ -607,6 +590,20 @@
             console.log('CheckInForm init - isOverspill:', _isOverspill, 'epj:', _currentEpj);
             if (_isOverspill) {
                 console.log('Loading Overspill data...');
+                
+                // Pre-select the checkout zone for overspill check-in location
+                if (_checkoutZone) {
+                    var osZoneSelect = document.getElementById('overspillCheckInZone');
+                    if (osZoneSelect) {
+                        for (var i = 0; i < osZoneSelect.options.length; i++) {
+                            if (osZoneSelect.options[i].value === _checkoutZone) {
+                                osZoneSelect.value = _checkoutZone;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
                 loadOverspillData();
                 
                 // Set up zone filter change handler
@@ -629,6 +626,20 @@
                 if (checkInBtn) checkInBtn.disabled = false;
                 var feedback = document.getElementById('feedback');
                 if (feedback) feedback.innerText = '';
+                
+                // Pre-select the checkout zone as default location
+                if (_checkoutZone) {
+                    var zoneSelect = document.getElementById('checkInZone');
+                    if (zoneSelect) {
+                        // Try to select the matching option
+                        for (var i = 0; i < zoneSelect.options.length; i++) {
+                            if (zoneSelect.options[i].value === _checkoutZone) {
+                                zoneSelect.value = _checkoutZone;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
             
             // EPJ Swap Modal - data storage
@@ -789,18 +800,9 @@
                             feedback.textContent = message;
                             feedback.style.color = 'red';
                         } else {
-                            feedback.textContent = message + ' Logging you out...';
-                            feedback.style.color = 'green';
-                            
-                            // Log the driver out after successful swap
-                            setTimeout(function() {
-                                closeEpjSwapModal();
-                                if (typeof logout === 'function') {
-                                    logout();
-                                } else {
-                                    alert('EPJ swapped successfully! Please log in again.');
-                                }
-                            }, 2000);
+                            // Instant redirect
+                            closeEpjSwapModal();
+                            if (typeof logout === 'function') logout();
                         }
                     })
                     .withFailureHandler(function(err) {
