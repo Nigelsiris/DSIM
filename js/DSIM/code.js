@@ -771,7 +771,7 @@ function adminForceCheckIn(data) {
   if (originalTrip) {
     const originalDriver = originalTrip[3];
     const originalZone = originalTrip[8];
-    const checkInLocation = data.location || 'Admin Override';
+    const checkInLocation = data.location || originalZone || 'Unknown';
     logSheet.appendRow([
         data.tripId, new Date(), session.username, originalDriver, "", "",
         data.epj, "", originalZone, "Check-In", "", checkInLocation,

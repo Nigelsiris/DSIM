@@ -1838,6 +1838,7 @@
                 var _allEpjDetails = [];
                 var _seenCheckoutIds = {}; // Track seen checkouts by tripId to trigger sounds for new ones
                 var _isFirstCheckoutLoad = true; // Don't play sounds on initial page load
+                var _lastKnownLoginKeys = null; // Track login identifiers to detect new sign-ins
                 var _notificationSound = null;
                 var _isRefreshing = false; // Prevent multiple refresh attempts
                 var _consecutiveErrors = 0; // Track consecutive errors
@@ -1906,13 +1907,9 @@
                         } catch(e) {
                             console.error('Error in ' + errorContext + ':', e);
                             _consecutiveErrors++;
+                            // Log warnings but don't kill timers - individual handlers manage session errors
                             if (_consecutiveErrors > 5) {
-                                console.error('Too many consecutive errors, stopping timers');
-                                stopAllTimers();
-                                var feedback = document.getElementById('feedback');
-                                if (feedback) {
-                                    feedback.innerHTML = '<strong style="color:red;">Multiple errors detected. Please refresh the page.</strong>';
-                                }
+                                console.warn('Multiple consecutive errors in polling (' + _consecutiveErrors + '). Timers still running.');
                             }
                         }
                     };
@@ -1938,7 +1935,7 @@
                             if (!window.liveCheckoutsTimer) {
                                 window.liveCheckoutsTimer = setInterval(safeCall(function() {
                                     refreshLiveCheckouts(false);
-                                }, 'liveCheckouts'), 30000);
+                                }, 'liveCheckouts'), 60000);
                             }
                         }
                     }
@@ -2721,6 +2718,23 @@
                     
                     google.script.run
                         .withSuccessHandler(function(logins) {
+                            resetErrorCounter();
+                            
+                            // Build a key string from login data to detect ANY changes
+                            var currentKeys = '';
+                            if (logins && logins.length > 0) {
+                                currentKeys = logins.map(function(l) {
+                                    return (l.username || '') + ':' + (l.timestampMs || '') + ':' + (l.eventType || '');
+                                }).join('|');
+                            }
+                            
+                            // Detect new sign-ins: if login data changed since last check, refresh live checkouts
+                            if (_lastKnownLoginKeys !== null && currentKeys !== _lastKnownLoginKeys) {
+                                console.log('Driver login change detected, refreshing live checkouts');
+                                refreshLiveCheckouts(false);
+                            }
+                            _lastKnownLoginKeys = currentKeys;
+                            
                             // Update badge with recent login count (sounds are handled by checkout detection)
                             var badge = document.getElementById('recentLoginsBadge');
                             if (logins && logins.length > 0) {
@@ -2757,14 +2771,24 @@
                 
                 // Track if a refresh is in progress to prevent overlapping calls
                 var _liveCheckoutsInProgress = false;
+                var _liveCheckoutsInProgressSince = 0;
                 var _dashboardRefreshInProgress = false;
                 
                 // Function to refresh only live checkouts (lightweight, fast)
                 window.refreshLiveCheckouts = function(forceRefresh) {
                     if (!_token || _isRefreshing) return;
-                    if (_liveCheckoutsInProgress && !forceRefresh) return; // Skip if already in progress (unless forced)
+                    // Auto-reset stuck in-progress flag after 45 seconds
+                    if (_liveCheckoutsInProgress && !forceRefresh) {
+                        if (Date.now() - _liveCheckoutsInProgressSince > 45000) {
+                            console.warn('Live checkouts refresh was stuck, resetting');
+                            _liveCheckoutsInProgress = false;
+                        } else {
+                            return; // Skip if already in progress (unless forced)
+                        }
+                    }
                     
                     _liveCheckoutsInProgress = true;
+                    _liveCheckoutsInProgressSince = Date.now();
                     
                     var btn = document.getElementById('refreshCheckoutsBtn');
                     if (forceRefresh && btn) {
@@ -2859,7 +2883,7 @@
                                 '<td class="worked-cell"><input type="checkbox" class="worked-checkbox" data-trip-id="' + trip.tripId + '"' + checkedAttr + ' onchange="toggleWorkedStatus(this, \'' + trip.tripId + '\')" title="Mark as worked"></td>' +
                                 '<td>' +
                                     '<button class="outline" onclick="openEpjSwapModal(\'' + trip.tripId + '\', \'' + trip.epj + '\', \'' + trip.driver + '\', \'' + trip.driverUsername + '\')">Swap</button>' +
-                                    '<button class="secondary outline" onclick="forceCheckIn(\'' + trip.tripId + '\', \'' + trip.epj + '\')">Check-In</button>' +
+                                    '<button class="secondary outline" onclick="forceCheckIn(\'' + trip.tripId + '\', \'' + trip.epj + '\', \'' + (trip.zone || '').replace(/'/g, '') + '\')">Check-In</button>' +
                                 '</td></tr>';
                         });
                     } else {
@@ -2879,10 +2903,12 @@
                     }
                 }
                 
-                // Poll live checkouts every 30 seconds (reduced from 10 to prevent excessive calls)
+                // Poll live checkouts every 60 seconds; new sign-ins trigger immediate refresh via login checker
                 window.liveCheckoutsTimer = setInterval(safeCall(function() {
                     refreshLiveCheckouts(false);
-                }, 'liveCheckouts'), 30000);
+                }, 'liveCheckouts'), 60000);
+                // Also do an initial live checkouts fetch right away
+                setTimeout(function() { refreshLiveCheckouts(false); }, 1500);
 
                 // Close context menu when clicking anywhere
                 document.addEventListener('click', function(e) {
@@ -2950,8 +2976,10 @@
                 
                 // Load immediately when page loads
                 loadDashboardData();
-                // Full dashboard refresh every 2 minutes (reduced frequency)
-                window.dashboardRefreshTimer = setInterval(safeCall(loadDashboardData, 'dashboardRefresh'), 120000);
+                // Full dashboard refresh - uses restartAutoRefresh (respects user preference) with 120s fallback
+                if (!window.dashboardRefreshTimer) {
+                    window.dashboardRefreshTimer = setInterval(safeCall(loadDashboardData, 'dashboardRefresh'), 120000);
+                }
 
                 function populateDashboard(data) {
                     var feedback = document.getElementById('feedback');
@@ -3269,12 +3297,14 @@
                     }
                 };
 
-                window.forceCheckIn = function(tripId, epj) {
+                window.forceCheckIn = function(tripId, epj, tripZone) {
                     // Open force check-in modal with location selection
                     var modal = document.getElementById('forceCheckinModal');
                     document.getElementById('forceCheckinTripId').value = tripId;
                     document.getElementById('forceCheckinEpj').textContent = epj;
                     document.getElementById('forceCheckinFeedback').textContent = '';
+                    // Store the trip zone for fallback
+                    modal.dataset.tripZone = tripZone || '';
                     
                     // Load zones from the server
                     var locationSelect = document.getElementById('forceCheckinLocation');
@@ -3282,18 +3312,26 @@
                     
                     google.script.run
                         .withSuccessHandler(function(zones) {
-                            locationSelect.innerHTML = '<option value="">Select location (optional)</option>';
+                            locationSelect.innerHTML = '';
+                            var defaultOpt = document.createElement('option');
+                            defaultOpt.value = '';
+                            defaultOpt.textContent = 'Select return location...';
+                            locationSelect.appendChild(defaultOpt);
                             if (zones && zones.length > 0) {
                                 zones.forEach(function(zone) {
                                     var opt = document.createElement('option');
                                     opt.value = zone;
                                     opt.textContent = zone;
+                                    // Pre-select the trip's original zone
+                                    if (tripZone && zone === tripZone) {
+                                        opt.selected = true;
+                                    }
                                     locationSelect.appendChild(opt);
                                 });
                             }
                         })
                         .withFailureHandler(function(err) {
-                            locationSelect.innerHTML = '<option value="">Select location (optional)</option>';
+                            locationSelect.innerHTML = '<option value="">Select return location...</option>';
                             console.log('Could not load zones:', err);
                         })
                         .getZonesList({token: _token});
@@ -3308,9 +3346,14 @@
                 window.confirmForceCheckin = function() {
                     var tripId = document.getElementById('forceCheckinTripId').value;
                     var epj = document.getElementById('forceCheckinEpj').textContent;
-                    var location = document.getElementById('forceCheckinLocation').value;
+                    var checkinLocation = document.getElementById('forceCheckinLocation').value;
+                    var modal = document.getElementById('forceCheckinModal');
+                    var tripZone = modal ? modal.dataset.tripZone : '';
                     var feedback = document.getElementById('forceCheckinFeedback');
                     var btn = document.getElementById('forceCheckinConfirmBtn');
+                    
+                    // Use selected location, fallback to trip's original zone, then 'Unknown'
+                    var finalLocation = checkinLocation || tripZone || 'Unknown';
                     
                     setButtonLoading(btn, true);
                     feedback.textContent = 'Processing check-in...';
@@ -3340,7 +3383,7 @@
                             token: _token, 
                             tripId: tripId, 
                             epj: epj, 
-                            location: location || 'Admin Override'
+                            location: finalLocation
                         });
                 };
                 
