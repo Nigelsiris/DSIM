@@ -23,23 +23,28 @@ function getAllUsers(data) {
   return users;
 }
 // --- CONFIGURATION ---
-const LOG_SHEET_NAME = 'Form Responses 1';
-const STATUS_SHEET_NAME = 'EPJ_Status';
-const USER_SHEET_NAME = 'Users';
-const MAINT_LOG_SHEET_NAME = 'Maintenance_Log';
-const ZONES_SHEET_NAME = 'Zones';
-const LOGIN_LOG_SHEET_NAME = 'Login_Log';
-
-// --- PASTE YOUR WAREHOUSE COORDINATES HERE ---
-const WAREHOUSE_LAT = 39.58390517747175;
-const WAREHOUSE_LON = -76.02613486224995;
-const GEOFENCE_RADIUS_METERS = 500;
+// All values below can be changed via the Admin Settings UI (stored in Script Properties).
+// Defaults are used until an admin saves a custom value.
+const _scriptProps = PropertiesService.getScriptProperties();
+const LOG_SHEET_NAME         = _scriptProps.getProperty('LOG_SHEET_NAME')         || 'Form Responses 1';
+const STATUS_SHEET_NAME      = _scriptProps.getProperty('STATUS_SHEET_NAME')      || 'EPJ_Status';
+const USER_SHEET_NAME        = _scriptProps.getProperty('USER_SHEET_NAME')        || 'Users';
+const MAINT_LOG_SHEET_NAME   = _scriptProps.getProperty('MAINT_LOG_SHEET_NAME')   || 'Maintenance_Log';
+const ZONES_SHEET_NAME       = _scriptProps.getProperty('ZONES_SHEET_NAME')       || 'Zones';
+const LOGIN_LOG_SHEET_NAME   = _scriptProps.getProperty('LOGIN_LOG_SHEET_NAME')   || 'Login_Log';
+const SYSTEM_TITLE           = _scriptProps.getProperty('SYSTEM_TITLE')           || 'Warehouse Sign-In System';
+const GEOFENCE_ENABLED       = (_scriptProps.getProperty('GEOFENCE_ENABLED')      || 'true') === 'true';
+const WAREHOUSE_LAT          = parseFloat(_scriptProps.getProperty('WAREHOUSE_LAT')          || '39.58390517747175');
+const WAREHOUSE_LON          = parseFloat(_scriptProps.getProperty('WAREHOUSE_LON')          || '-76.02613486224995');
+const GEOFENCE_RADIUS_METERS = parseInt(  _scriptProps.getProperty('GEOFENCE_RADIUS_METERS') || '500', 10);
+const INACTIVITY_TIMEOUT_MIN = parseInt(  _scriptProps.getProperty('INACTIVITY_TIMEOUT_MIN') || '2',   10);
+const SESSION_DURATION_SEC   = parseInt(  _scriptProps.getProperty('SESSION_DURATION_SEC')   || '86400', 10);
 // --- END OF CONFIGURATION ---
 
 function doGet(e) {
   // This serves the main entry point, likely the login page.
   return HtmlService.createHtmlOutputFromFile('Index')
-      .setTitle('Warehouse Sign-In System')
+      .setTitle(SYSTEM_TITLE)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -256,7 +261,7 @@ function loginAndGetUserView(loginData) {
   }
   
   const token = Utilities.getUuid();
-  CacheService.getScriptCache().put(token, JSON.stringify(user), 86400);
+  CacheService.getScriptCache().put(token, JSON.stringify(user), SESSION_DURATION_SEC);
   // Don't generate HTML here - let client fetch it separately for faster login
   return { token: token, role: user.role };
 }
@@ -1420,6 +1425,77 @@ function adminGetAllEpjs(data) {
     status: String(row[1] || '').trim(),
     storeOnly: row[2] === true || row[2] === 'TRUE' || row[2] === 'Yes'
   }));
+}
+
+// --- SYSTEM CONFIGURATION MANAGEMENT ---
+
+/**
+ * Returns all system configuration values for the Admin Settings UI.
+ * Admin-only.
+ */
+function getSystemConfig(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+  const props = PropertiesService.getScriptProperties();
+  return {
+    SYSTEM_TITLE:           props.getProperty('SYSTEM_TITLE')           || 'Warehouse Sign-In System',
+    GEOFENCE_ENABLED:       props.getProperty('GEOFENCE_ENABLED')       || 'true',
+    WAREHOUSE_LAT:          props.getProperty('WAREHOUSE_LAT')          || '39.58390517747175',
+    WAREHOUSE_LON:          props.getProperty('WAREHOUSE_LON')          || '-76.02613486224995',
+    GEOFENCE_RADIUS_METERS: props.getProperty('GEOFENCE_RADIUS_METERS') || '500',
+    INACTIVITY_TIMEOUT_MIN: props.getProperty('INACTIVITY_TIMEOUT_MIN') || '2',
+    SESSION_DURATION_SEC:   props.getProperty('SESSION_DURATION_SEC')   || '86400',
+    LOG_SHEET_NAME:         props.getProperty('LOG_SHEET_NAME')         || 'Form Responses 1',
+    STATUS_SHEET_NAME:      props.getProperty('STATUS_SHEET_NAME')      || 'EPJ_Status',
+    USER_SHEET_NAME:        props.getProperty('USER_SHEET_NAME')        || 'Users',
+    MAINT_LOG_SHEET_NAME:   props.getProperty('MAINT_LOG_SHEET_NAME')   || 'Maintenance_Log',
+    ZONES_SHEET_NAME:       props.getProperty('ZONES_SHEET_NAME')       || 'Zones',
+    LOGIN_LOG_SHEET_NAME:   props.getProperty('LOGIN_LOG_SHEET_NAME')   || 'Login_Log'
+  };
+}
+
+/**
+ * Saves system configuration values from the Admin Settings UI.
+ * Admin-only. Clears all caches so changes take effect on the next request.
+ */
+function saveSystemConfig(data) {
+  const session = getSession(data.token);
+  if (!session || session.role !== 'Admin') throw new Error('Permission denied.');
+
+  const cfg = data.config || {};
+  const props = PropertiesService.getScriptProperties();
+  const allowed = [
+    'SYSTEM_TITLE', 'GEOFENCE_ENABLED',
+    'WAREHOUSE_LAT', 'WAREHOUSE_LON', 'GEOFENCE_RADIUS_METERS',
+    'INACTIVITY_TIMEOUT_MIN', 'SESSION_DURATION_SEC',
+    'LOG_SHEET_NAME', 'STATUS_SHEET_NAME', 'USER_SHEET_NAME',
+    'MAINT_LOG_SHEET_NAME', 'ZONES_SHEET_NAME', 'LOGIN_LOG_SHEET_NAME'
+  ];
+  const toSet = {};
+  allowed.forEach(function(key) {
+    if (cfg[key] !== undefined && cfg[key] !== null) {
+      toSet[key] = String(cfg[key]).trim();
+    }
+  });
+  if (Object.keys(toSet).length > 0) {
+    props.setProperties(toSet);
+  }
+  // Clear all caches (data only – not session tokens) so the next request picks up the new config values.
+  clearStateCache();
+  return 'Configuration saved successfully. Reload the page to apply all changes.';
+}
+
+/**
+ * Returns a small set of public settings that the Index / Login page can use
+ * without authentication (e.g., the system title for the page header).
+ */
+function getPublicSettings() {
+  const props = PropertiesService.getScriptProperties();
+  return {
+    systemTitle:          props.getProperty('SYSTEM_TITLE')           || 'Warehouse Sign-In System',
+    geofenceEnabled:      (props.getProperty('GEOFENCE_ENABLED')      || 'true') === 'true',
+    inactivityTimeoutMin: parseInt(props.getProperty('INACTIVITY_TIMEOUT_MIN') || '2', 10)
+  };
 }
 
 function sha256(input) {

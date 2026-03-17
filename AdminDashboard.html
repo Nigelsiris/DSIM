@@ -635,15 +635,6 @@
                 </article>
             </div>
 
-            <p id="feedback" style="text-align:center; min-height: 20px;"></p>
-        </main>
-
-        <!-- Driver Login Notification Toast -->
-        <div id="loginNotification" class="notification-toast"></div>
-        
-        <!-- Recent Logins Badge -->
-        <div id="recentLoginsBadge" class="notification-badge"></div>
-
             <!-- Tab: Settings -->
             <div id="tab-settings" class="tab-content">
                 <article>
@@ -709,10 +700,120 @@
                             <input type="checkbox" id="prefCompactMode" role="switch">
                         </div>
                     </div>
-                    
-                    <p style="text-align:center; color:var(--muted-color); font-size:0.85rem; margin-top:1rem;">Settings are saved to your browser and will persist between sessions.</p>
+
+                    <!-- System Configuration (server-side, Admin only) -->
+                    <div class="notification-prefs">
+                        <h4>🛠️ System Configuration</h4>
+                        <p id="sysConfigStatus" style="min-height:1.2em; font-size:0.85rem; margin-bottom:0.5rem;"></p>
+
+                        <div class="pref-row">
+                            <label for="sysTitle">System / App Title</label>
+                            <input type="text" id="sysTitle" placeholder="Warehouse Sign-In System"
+                                   style="width:220px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                        </div>
+
+                        <div class="pref-row">
+                            <label for="sysGeofenceEnabled">Enable geofence (location) logging</label>
+                            <input type="checkbox" id="sysGeofenceEnabled" role="switch">
+                        </div>
+
+                        <div class="pref-row">
+                            <label for="sysWarehouseLat">Warehouse Latitude</label>
+                            <input type="number" id="sysWarehouseLat" step="0.00001"
+                                   placeholder="39.58390517747175"
+                                   style="width:180px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                        </div>
+
+                        <div class="pref-row">
+                            <label for="sysWarehouseLon">Warehouse Longitude</label>
+                            <input type="number" id="sysWarehouseLon" step="0.00001"
+                                   placeholder="-76.02613486224995"
+                                   style="width:180px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                        </div>
+
+                        <div class="pref-row">
+                            <label for="sysGeofenceRadius">Geofence Radius (meters)</label>
+                            <input type="number" id="sysGeofenceRadius" min="50" max="50000"
+                                   placeholder="500"
+                                   style="width:120px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                        </div>
+
+                        <div class="pref-row">
+                            <label for="sysInactivityTimeout">Driver inactivity timeout (minutes)</label>
+                            <input type="number" id="sysInactivityTimeout" min="1" max="60"
+                                   placeholder="2"
+                                   style="width:100px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                        </div>
+
+                        <div class="pref-row">
+                            <label for="sysSessionDuration">Session duration (seconds)</label>
+                            <input type="number" id="sysSessionDuration" min="3600" max="604800"
+                                   placeholder="86400"
+                                   style="width:120px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                        </div>
+
+                        <details style="margin-top:0.75rem;">
+                            <summary style="cursor:pointer; font-size:0.9rem; color:var(--muted-color); padding:0.5rem 0;">
+                                ▶ Advanced: Spreadsheet Sheet Names
+                            </summary>
+                            <div style="padding:0.5rem 0 0;">
+                                <div class="pref-row">
+                                    <label for="sysLogSheet">Log / Form Responses Sheet</label>
+                                    <input type="text" id="sysLogSheet" placeholder="Form Responses 1"
+                                           style="width:200px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                                </div>
+                                <div class="pref-row">
+                                    <label for="sysStatusSheet">EPJ Status Sheet</label>
+                                    <input type="text" id="sysStatusSheet" placeholder="EPJ_Status"
+                                           style="width:200px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                                </div>
+                                <div class="pref-row">
+                                    <label for="sysUserSheet">Users Sheet</label>
+                                    <input type="text" id="sysUserSheet" placeholder="Users"
+                                           style="width:200px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                                </div>
+                                <div class="pref-row">
+                                    <label for="sysMaintSheet">Maintenance Log Sheet</label>
+                                    <input type="text" id="sysMaintSheet" placeholder="Maintenance_Log"
+                                           style="width:200px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                                </div>
+                                <div class="pref-row">
+                                    <label for="sysZonesSheet">Zones Sheet</label>
+                                    <input type="text" id="sysZonesSheet" placeholder="Zones"
+                                           style="width:200px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                                </div>
+                                <div class="pref-row">
+                                    <label for="sysLoginLogSheet">Login Log Sheet</label>
+                                    <input type="text" id="sysLoginLogSheet" placeholder="Login_Log"
+                                           style="width:200px; margin:0; padding:0.4rem 0.6rem; font-size:0.85rem;">
+                                </div>
+                            </div>
+                        </details>
+
+                        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--muted-border-color); display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <button id="loadSysConfigBtn" class="secondary outline" onclick="loadSystemConfig()" style="flex:1; min-width:120px;">
+                                <span>↺ Reload Config</span>
+                            </button>
+                            <button id="saveSystemConfigBtn" onclick="saveSystemConfigToServer()" style="flex:2; min-width:160px;">
+                                <span>💾 Save System Configuration</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <p style="text-align:center; color:var(--muted-color); font-size:0.85rem; margin-top:1rem;">
+                        Notification &amp; display settings are saved to your browser. System configuration is saved to the server and affects all users.
+                    </p>
                 </article>
             </div>
+
+            <p id="feedback" style="text-align:center; min-height: 20px;"></p>
+        </main>
+
+        <!-- Driver Login Notification Toast -->
+        <div id="loginNotification" class="notification-toast"></div>
+        
+        <!-- Recent Logins Badge -->
+        <div id="recentLoginsBadge" class="notification-badge"></div>
 
         <!-- Context Menu for EPJ Cards -->
         <div id="epjContextMenu" class="context-menu">
@@ -2275,6 +2376,117 @@
                             isOverspill: isOverspill
                         });
                 };
+
+                // --- System Configuration ---
+                // Load configuration values from the server into the Settings tab form fields
+                window.loadSystemConfig = function() {
+                    var statusEl = document.getElementById('sysConfigStatus');
+                    if (statusEl) statusEl.textContent = 'Loading...';
+                    var btn = document.getElementById('loadSysConfigBtn');
+                    setButtonLoading(btn, true);
+
+                    google.script.run
+                        .withSuccessHandler(function(config) {
+                            setButtonLoading(btn, false);
+                            if (!config) {
+                                if (statusEl) statusEl.textContent = 'No config returned.';
+                                return;
+                            }
+                            var map = {
+                                sysTitle:            config.SYSTEM_TITLE,
+                                sysWarehouseLat:     config.WAREHOUSE_LAT,
+                                sysWarehouseLon:     config.WAREHOUSE_LON,
+                                sysGeofenceRadius:   config.GEOFENCE_RADIUS_METERS,
+                                sysInactivityTimeout:config.INACTIVITY_TIMEOUT_MIN,
+                                sysSessionDuration:  config.SESSION_DURATION_SEC,
+                                sysLogSheet:         config.LOG_SHEET_NAME,
+                                sysStatusSheet:      config.STATUS_SHEET_NAME,
+                                sysUserSheet:        config.USER_SHEET_NAME,
+                                sysMaintSheet:       config.MAINT_LOG_SHEET_NAME,
+                                sysZonesSheet:       config.ZONES_SHEET_NAME,
+                                sysLoginLogSheet:    config.LOGIN_LOG_SHEET_NAME
+                            };
+                            Object.keys(map).forEach(function(id) {
+                                var el = document.getElementById(id);
+                                if (el && map[id] !== undefined && map[id] !== null) {
+                                    el.value = map[id];
+                                }
+                            });
+                            var geofenceCheck = document.getElementById('sysGeofenceEnabled');
+                            if (geofenceCheck) {
+                                geofenceCheck.checked = (config.GEOFENCE_ENABLED === 'true' || config.GEOFENCE_ENABLED === true);
+                            }
+                            if (statusEl) statusEl.innerHTML = '<span style="color:green;">Config loaded.</span>';
+                            setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 3000);
+                        })
+                        .withFailureHandler(function(err) {
+                            setButtonLoading(btn, false);
+                            if (handleSessionError(err)) return;
+                            if (statusEl) statusEl.innerHTML = '<span style="color:red;">Error loading config: ' + (err.message || 'Unknown') + '</span>';
+                        })
+                        .getSystemConfig({token: _token});
+                };
+
+                // Save configuration values from the Settings tab form fields to the server
+                window.saveSystemConfigToServer = function() {
+                    var statusEl = document.getElementById('sysConfigStatus');
+                    var btn = document.getElementById('saveSystemConfigBtn');
+                    setButtonLoading(btn, true);
+                    if (statusEl) statusEl.textContent = 'Saving...';
+
+                    function val(id) {
+                        var el = document.getElementById(id);
+                        return el ? el.value.trim() : '';
+                    }
+                    function chk(id) {
+                        var el = document.getElementById(id);
+                        return el ? el.checked : false;
+                    }
+
+                    var config = {
+                        SYSTEM_TITLE:           val('sysTitle'),
+                        GEOFENCE_ENABLED:       String(chk('sysGeofenceEnabled')),
+                        WAREHOUSE_LAT:          val('sysWarehouseLat'),
+                        WAREHOUSE_LON:          val('sysWarehouseLon'),
+                        GEOFENCE_RADIUS_METERS: val('sysGeofenceRadius'),
+                        INACTIVITY_TIMEOUT_MIN: val('sysInactivityTimeout'),
+                        SESSION_DURATION_SEC:   val('sysSessionDuration'),
+                        LOG_SHEET_NAME:         val('sysLogSheet'),
+                        STATUS_SHEET_NAME:      val('sysStatusSheet'),
+                        USER_SHEET_NAME:        val('sysUserSheet'),
+                        MAINT_LOG_SHEET_NAME:   val('sysMaintSheet'),
+                        ZONES_SHEET_NAME:       val('sysZonesSheet'),
+                        LOGIN_LOG_SHEET_NAME:   val('sysLoginLogSheet')
+                    };
+
+                    google.script.run
+                        .withSuccessHandler(function(message) {
+                            setButtonLoading(btn, false);
+                            if (statusEl) statusEl.innerHTML = '<span style="color:green;">' + message + '</span>';
+                        })
+                        .withFailureHandler(function(err) {
+                            setButtonLoading(btn, false);
+                            if (handleSessionError(err)) return;
+                            if (statusEl) statusEl.innerHTML = '<span style="color:red;">Error: ' + (err.message || 'Unknown') + '</span>';
+                        })
+                        .saveSystemConfig({token: _token, config: config});
+                };
+
+                // Auto-load system config when the Settings tab is activated
+                (function patchTabNavForSettings() {
+                    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                        btn.addEventListener('click', function() {
+                            if (this.dataset.tab === 'settings') {
+                                setTimeout(loadSystemConfig, 100);
+                            }
+                        });
+                    });
+                    // Also load if settings tab is already the restored active tab
+                    var savedTab = localStorage.getItem('adminActiveTab');
+                    if (savedTab === 'settings') {
+                        setTimeout(loadSystemConfig, 500);
+                    }
+                })();
             })();
         </script>
     </body>
