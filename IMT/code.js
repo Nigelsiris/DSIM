@@ -6,6 +6,7 @@
  * - Extracts Shift Data and Additional Costs dynamically based on custom Header Config aliases.
  * - Enforces GL Cost Tolerances and Ignore Rules to prevent $0.00 or irrelevant items from being coded.
  * - Cross-references with Haulier Reports AND writes the Invoice # & Amount back to the Haulier sheet.
+ * - Intelligently reallocates TUs marked as 'O' (Others) into specific GL codes.
  * - Aggregates invoice totals and applies customizable GL coding.
  * - Auto-generates stamped PDFs for the accounting team.
  * - Processes from root folders and automatically sorts files into RDC sub-folders.
@@ -62,6 +63,7 @@ function setupConfigTab() {
       ['Cost Center', 'PYE', '70001', 'Perryville Cost Center Code'],
       ['Category Mapping', 'toll', '471000, 47100002', 'Catches any line item containing "toll"'],
       ['Category Mapping', 'fuel', '471000, 47100099', 'Catches any line item containing "fuel"'],
+      ['Category Mapping', 'others', '471000, 47100099', 'Used for TUs marked as Type O in Haulier Report'],
       ['Default Category', 'BASE', '471000, 47100001', 'Base freight applied to all other costs'],
       ['Ignore Rule', 'discount', '', 'Completely ignores any line item containing this word'],
       ['Ignore Rule', 'rebate', '', 'Completely ignores any line item containing this word'],
@@ -438,6 +440,7 @@ function processInvoiceRouter(file, rdcName, carrierName, haulierInfo, masterDat
   let isTemp = false;
   let fileCostSummary = []; 
   const initialDiscrepancyCount = discrepancyData.length; 
+  const initialTmstCount = tmstData.length;
   
   // Extract clean invoice name to act as the Invoice Number for writing back
   const fallbackInvoiceName = file.getName().replace(/\.xlsx$/i, '');
@@ -476,6 +479,7 @@ function processInvoiceRouter(file, rdcName, carrierName, haulierInfo, masterDat
     }
 
     const fileDiscrepancies = discrepancyData.slice(initialDiscrepancyCount);
+    const fileTmstData = tmstData.slice(initialTmstCount);
 
     Logger.log(`    -> Discrepancy Check for ${file.getName()}: Found ${fileDiscrepancies.length} issues.`);
 
@@ -488,7 +492,7 @@ function processInvoiceRouter(file, rdcName, carrierName, haulierInfo, masterDat
     } 
     else if (rdcName !== 'UNKNOWN' && fileCostSummary.length > 0) {
       Logger.log(`    -> Applying GL Codes & generating PDF for ${file.getName()}. Total cost items found: ${fileCostSummary.length}`);
-      applyGLCodesAndExportPDF(invoiceSS, file.getName(), rdcName, fileCostSummary, glConfig, targetFolder);
+      applyGLCodesAndExportPDF(invoiceSS, file.getName(), rdcName, fileCostSummary, glConfig, targetFolder, fileTmstData);
     } 
     else {
       Logger.log(`    -> SKIPPING GL PDF for ${file.getName()}: RDC is '${rdcName}' (Must not be UNKNOWN) AND Cost Summary length is ${fileCostSummary.length} (Must be > 0).`);
@@ -555,28 +559,112 @@ function createDiscrepancyEmailDraft(carrierName, fileName, discrepancies, email
 
 // --- GL CODING & PDF EXPORT LOGIC ---
 
-function applyGLCodesAndExportPDF(invoiceSS, originalFileName, rdcName, fileCostSummary, glConfig, targetFolder) {
-  if (!glConfig || fileCostSummary.length === 0) return;
-  
+function applyGLCodesAndExportPDF(invoiceSS, originalFileName, rdcName, fileCostSummary, glConfig, targetFolder, fileTmstData) {
+  if (!glConfig) return;
+
   const costCenter = glConfig.costCenters[rdcName] || 'XXXXX';
+  const defaultPrefix = glConfig.defaultCategory || 'XXXXXX, XXXXXXXX';
+  const defaultGlString = `${defaultPrefix}, ${costCenter}`;
+  const othersPrefix = getCategoryPrefix_(glConfig, 'others', '471000, 47100099');
+  const othersGlString = `${othersPrefix}, ${costCenter}`;
+  const transferPrefix = getCategoryPrefix_(glConfig, 'transfer', '471000, 47100004');
+
   const glTotals = {};
   let grandTotal = 0;
-  
-  fileCostSummary.forEach(item => {
-    const descLower = item.desc.toLowerCase();
-    let glPrefix = glConfig.defaultCategory || 'XXXXXX, XXXXXXXX';
-    
-    for (let cat of glConfig.categories) {
-      if (descLower.includes(cat.keyword)) {
-        glPrefix = cat.glPrefix; break;
-      }
+
+  const invoiceTotal = findInvoiceTotal_(invoiceSS);
+  const tmstAllocation = buildTmstAllocation_(fileTmstData, glConfig);
+
+  // Preferred path: TMST/haulier-driven allocation (Store vs O vs Transfer)
+  if (tmstAllocation.total > 0) {
+    const othersTotal = tmstAllocation.othersTotal;
+    const transferTotal = sumObjectValues_(tmstAllocation.transferByCostCenter);
+    const authoritativeTotal = (invoiceTotal !== null && invoiceTotal > 0) ? invoiceTotal : tmstAllocation.total;
+
+    // Store delivery pool is the remainder after O-type and transfer allocations.
+    let baseTotal = authoritativeTotal - othersTotal - transferTotal;
+    if (baseTotal < 0) {
+      Logger.log(
+        `[WARNING] Base allocation negative for ${originalFileName}. Invoice: $${authoritativeTotal.toFixed(2)} | Others: $${othersTotal.toFixed(2)} | Transfer: $${transferTotal.toFixed(2)}.`
+      );
+      baseTotal = 0;
     }
-    
-    const fullGlString = `${glPrefix}, ${costCenter}`;
-    if (!glTotals[fullGlString]) glTotals[fullGlString] = 0;
-    glTotals[fullGlString] += item.amount;
-    grandTotal += item.amount;
-  });
+
+    if (baseTotal > 0) glTotals[defaultGlString] = baseTotal;
+    if (othersTotal > 0) glTotals[othersGlString] = othersTotal;
+
+    Object.keys(tmstAllocation.transferByCostCenter).forEach(cc => {
+      const amount = tmstAllocation.transferByCostCenter[cc];
+      if (amount <= 0) return;
+      const transferGlString = `${transferPrefix}, ${cc}`;
+      glTotals[transferGlString] = (glTotals[transferGlString] || 0) + amount;
+    });
+
+    grandTotal = sumObjectValues_(glTotals);
+
+    // Safety sync: keep stamped total exactly aligned with authoritative invoice total.
+    if (authoritativeTotal > 0 && Math.abs(grandTotal - authoritativeTotal) > 0.01) {
+      const delta = authoritativeTotal - grandTotal;
+      glTotals[defaultGlString] = Math.max(0, (glTotals[defaultGlString] || 0) + delta);
+      grandTotal = sumObjectValues_(glTotals);
+      Logger.log(
+        `[WARNING] Allocation normalized for ${originalFileName}. Delta applied to base bucket: $${delta.toFixed(2)}.`
+      );
+    }
+
+    Logger.log(
+      `[GL ALLOCATION] ${originalFileName} | Invoice: $${authoritativeTotal.toFixed(2)} | Base(Store): $${(glTotals[defaultGlString] || 0).toFixed(2)} | Others(O): $${(glTotals[othersGlString] || 0).toFixed(2)} | Transfer: $${transferTotal.toFixed(2)} | Stamped Total: $${grandTotal.toFixed(2)}`
+    );
+  } else {
+    // Fallback: summary-line aggregation when TMST data is unavailable.
+    if (fileCostSummary.length === 0) return;
+
+    fileCostSummary.forEach(item => {
+      const descLower = item.desc.toLowerCase();
+      let glPrefix = defaultPrefix;
+
+      for (let cat of glConfig.categories) {
+        if (descLower.includes(cat.keyword)) {
+          glPrefix = cat.glPrefix;
+          break;
+        }
+      }
+
+      const fullGlString = `${glPrefix}, ${costCenter}`;
+      if (!glTotals[fullGlString]) glTotals[fullGlString] = 0;
+      glTotals[fullGlString] += item.amount;
+      grandTotal += item.amount;
+    });
+
+    if (invoiceTotal !== null && invoiceTotal > 0 && grandTotal > invoiceTotal + 0.01) {
+      let overflow = grandTotal - invoiceTotal;
+
+      if ((glTotals[defaultGlString] || 0) > 0) {
+        const cut = Math.min(glTotals[defaultGlString], overflow);
+        glTotals[defaultGlString] -= cut;
+        overflow -= cut;
+      }
+
+      if (overflow > 0) {
+        const keysBySize = Object.keys(glTotals)
+          .filter(k => glTotals[k] > 0)
+          .sort((a, b) => glTotals[b] - glTotals[a]);
+
+        for (let i = 0; i < keysBySize.length && overflow > 0; i++) {
+          const key = keysBySize[i];
+          const cut = Math.min(glTotals[key], overflow);
+          glTotals[key] -= cut;
+          overflow -= cut;
+        }
+      }
+
+      grandTotal = invoiceTotal;
+    }
+
+    Logger.log(
+      `[GL ALLOCATION] ${originalFileName} | Fallback summary allocation used | Stamped Total: $${grandTotal.toFixed(2)}`
+    );
+  }
   
   let stampRows = [];
   stampRows.push(['GL CODING SUMMARY', 'GL ACCOUNT / COST CENTER']);
@@ -619,6 +707,149 @@ function applyGLCodesAndExportPDF(invoiceSS, originalFileName, rdcName, fileCost
   
   const pdfName = originalFileName.replace(/\.xlsx$/i, '') + ' - CODED.pdf';
   exportSheetToPDF(invoiceSS.getId(), summarySheet.getSheetId(), pdfName, targetFolder);
+}
+
+function findInvoiceTotal_(invoiceSS) {
+  const labelRegex = /(invoice total|amount due|total due)/i;
+  const sheets = invoiceSS.getSheets();
+  const candidates = [];
+
+  for (let s = 0; s < sheets.length; s++) {
+    const data = sheets[s].getDataRange().getDisplayValues();
+
+    for (let r = 0; r < Math.min(data.length, 350); r++) {
+      const row = data[r];
+      if (isStampedCodingRow_(row)) continue;
+
+      for (let c = 0; c < Math.min(row.length, 20); c++) {
+        const cellText = String(row[c] || '').trim();
+        if (!cellText || !labelRegex.test(cellText)) continue;
+
+        const inlineAmount = parseCurrency_(cellText);
+        if (inlineAmount !== null && inlineAmount > 0) candidates.push(inlineAmount);
+
+        // Prefer amount in the same row to the right of the label.
+        for (let k = c + 1; k < Math.min(row.length, c + 8); k++) {
+          const parsed = parseCurrency_(row[k]);
+          if (parsed !== null && parsed > 0) candidates.push(parsed);
+        }
+
+        // Fallback: sometimes amount is placed directly under the label.
+        for (let rr = r + 1; rr <= Math.min(r + 2, data.length - 1); rr++) {
+          const parsedNext = parseCurrency_(data[rr][c]);
+          if (parsedNext !== null && parsedNext > 0) candidates.push(parsedNext);
+        }
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  return Math.max.apply(null, candidates);
+}
+
+function parseCurrency_(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return isNaN(value) ? null : value;
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  // Prefer explicit currency/decimal formats and ignore date-like integers.
+  const matches = text.match(/-?\$?\s*\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\$?\s*\d+\.\d+/g);
+  if (matches && matches.length) {
+    let best = null;
+    matches.forEach(token => {
+      const n = parseFloat(String(token).replace(/[^0-9.-]/g, ''));
+      if (!isNaN(n) && (best === null || Math.abs(n) > Math.abs(best))) best = n;
+    });
+    return best;
+  }
+
+  // Fallback for plain numeric cells (no commas/decimals), e.g. 5000.
+  if (!/^\s*[$-]?\s*\d+\s*$/.test(text)) return null;
+  const cleaned = text.replace(/[^0-9.-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') return null;
+
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? null : parsed;
+}
+
+function getCategoryPrefix_(glConfig, keyword, fallbackPrefix) {
+  const target = String(keyword || '').toLowerCase();
+  for (let i = 0; i < (glConfig.categories || []).length; i++) {
+    const cat = glConfig.categories[i];
+    if (String(cat.keyword || '').toLowerCase() === target) {
+      return cat.glPrefix || fallbackPrefix;
+    }
+  }
+  return fallbackPrefix;
+}
+
+function buildTmstAllocation_(fileTmstData, glConfig) {
+  const allocation = { total: 0, othersTotal: 0, transferByCostCenter: {} };
+  if (!fileTmstData || fileTmstData.length === 0) return allocation;
+
+  fileTmstData.forEach(row => {
+    const amount = parseCurrency_(row[8]); // totalCost
+    if (amount === null || amount <= 0) return;
+
+    allocation.total += amount;
+
+    const deliveryType = String(row[9] || '').trim().toUpperCase();
+    const storeCode = String(row[4] || '').trim().toUpperCase();
+
+    if (deliveryType === 'O') {
+      allocation.othersTotal += amount;
+      return;
+    }
+
+    // Transfers are keyed by transfer code (PT/GT/FT) and charged to destination warehouse.
+    const transferCostCenter = getTransferCostCenterForRow_(deliveryType, storeCode, glConfig);
+    if (!transferCostCenter) return;
+
+    if (!allocation.transferByCostCenter[transferCostCenter]) {
+      allocation.transferByCostCenter[transferCostCenter] = 0;
+    }
+    allocation.transferByCostCenter[transferCostCenter] += amount;
+  });
+
+  return allocation;
+}
+
+function getTransferCostCenterForRow_(deliveryType, storeCode, glConfig) {
+  const typeText = String(deliveryType || '').toUpperCase();
+  const storeText = String(storeCode || '').toUpperCase();
+  const compactType = typeText.replace(/\s+/g, '');
+  const compactStore = storeText.replace(/\s+/g, '');
+  const costCenters = (glConfig && glConfig.costCenters) ? glConfig.costCenters : {};
+
+  // First priority: explicit transfer code in Type column.
+  if (/\bPT\b/.test(typeText) || compactType.indexOf('PT') === 0) {
+    return costCenters.PYE || '70001';
+  }
+  if (/\bFT\b/.test(typeText) || compactType.indexOf('FT') === 0) {
+    return costCenters.FRG || '50001';
+  }
+  if (/\bGT\b/.test(typeText) || compactType.indexOf('GT') === 0) {
+    return costCenters.GRM || '60001';
+  }
+
+  // Fallback: infer destination warehouse from store/location text when transfer code is not explicit.
+  if (/\bPT\b/.test(storeText) || compactStore.indexOf('PT') === 0 || storeText.indexOf('PERRYVILLE') !== -1) {
+    return costCenters.PYE || '70001';
+  }
+  if (/\bFT\b/.test(storeText) || compactStore.indexOf('FT') === 0 || storeText.indexOf('FREDERICKSBURG') !== -1) {
+    return costCenters.FRG || '50001';
+  }
+  if (/\bGT\b/.test(storeText) || compactStore.indexOf('GT') === 0 || storeText.indexOf('GRAHAM') !== -1) {
+    return costCenters.GRM || '60001';
+  }
+
+  return '';
+}
+
+function sumObjectValues_(obj) {
+  return Object.keys(obj || {}).reduce((sum, key) => sum + (parseFloat(obj[key]) || 0), 0);
 }
 
 function exportSheetToPDF(spreadsheetId, sheetId, pdfName, folder) {
@@ -876,6 +1107,8 @@ function processHbInvoice(invoiceSS, rdcName, carrierName, haulierInfo, masterDa
       
       for (let i = 0; i < data.length; i++) {
         let rowStr = data[i].join(" ").toLowerCase();
+
+        if (isStampedCodingRow_(data[i])) continue;
         
         // Auto-detect start of charges to avoid reading invoice # or dates as costs
         if (!inChargesSection) {
@@ -1018,6 +1251,8 @@ function processCreInvoice(invoiceSS, rdcName, carrierName, haulierInfo, masterD
         
         let costsFound = 0;
         for (let i = headerRowIndex + 1; i < data.length; i++) {
+          if (isStampedCodingRow_(data[i])) continue;
+
           let desc = "";
           for (let col = 0; col < Math.min(data[i].length, 3); col++) {
             if (String(data[i][col]).trim() !== "") { desc = String(data[i][col]).trim(); break; }
@@ -1143,6 +1378,8 @@ function processSchInvoice(invoiceSS, rdcName, carrierName, haulierInfo, masterD
         
         let costsFound = 0;
         for (let i = headerRowIndex + 1; i < data.length; i++) {
+          if (isStampedCodingRow_(data[i])) continue;
+
           let desc = "";
           for (let col = 0; col < Math.min(data[i].length, 3); col++) {
             if (String(data[i][col]).trim() !== "") { desc = String(data[i][col]).trim(); break; }
@@ -1184,6 +1421,17 @@ function processSchInvoice(invoiceSS, rdcName, carrierName, haulierInfo, masterD
 }
 
 // --- HELPER FUNCTIONS ---
+
+function isStampedCodingRow_(rowValues) {
+  const rowText = rowValues.map(v => String(v || '')).join(' ').toLowerCase();
+
+  if (rowText.includes('gl coding summary') || rowText.includes('gl account / cost center') || rowText.includes('total invoice amount')) {
+    return true;
+  }
+
+  // Rows written by this script look like: "$123.45", "471000, 47100001, 60001"
+  return /\b\d{6}\s*,\s*\d{6,8}\s*,\s*\d{4,6}\b/.test(rowText);
+}
 
 function fetchHaulierData(spreadsheetId, headerAliases, rdcLogName = "Unknown RDC") {
   const info = { spreadsheetId: spreadsheetId, sheetName: null, records: {}, invoiceColIdx: -1, amountColIdx: -1, maxCol: 0 };
@@ -1361,260 +1609,31 @@ function clearTrackerData(isWebApp = false) {
 
 function doGet(e) {
   return HtmlService.createHtmlOutputFromFile('Index')
-      .setTitle('IMT Control Tower')
+      .setTitle('Invoice Automation Dashboard')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-// Helper: build a sheet summary object with embed/open URLs
-function getSheetSummary_(ss, sheetName, label, description, tone) {
-  var ssId  = ss.getId();
-  var ssUrl = ss.getUrl();
-  var sheet = ss.getSheetByName(sheetName);
-  var exists = !!sheet;
-  var gid = exists ? sheet.getSheetId() : 0;
-  return {
-    name:        sheetName,
-    label:       label       || sheetName,
-    description: description || '',
-    tone:        tone        || 'neutral',
-    exists:      exists,
-    rows:        exists ? Math.max(0, sheet.getLastRow() - 1) : 0,
-    openUrl:     exists ? ssUrl + '#gid=' + gid : '',
-    embedUrl:    exists ? 'https://docs.google.com/spreadsheets/d/' + ssId + '/htmlview?gid=' + gid : ''
-  };
-}
-
 function getDashboardData() {
-  var ss     = SpreadsheetApp.getActiveSpreadsheet();
-  var ssId   = ss.getId();
-  var ssUrl  = ss.getUrl();
-  var ssName = ss.getName();
-
-  // Config (safe: returns {} if System Config tab is missing)
-  var config = {};
-  try { config = getConfig(); } catch(e) { config = {}; }
-
-  // Build carrier objects from all ROOT_FOLDER and HAULIER_ID config keys
-  var allKeys  = Object.keys(config);
-  var carriers = [];
-
-  allKeys.filter(function(k) { return k.endsWith('_ROOT_FOLDER'); }).forEach(function(k) {
-    var name     = k.replace('_ROOT_FOLDER', '');
-    var folderId = String(config[k] || '').trim();
-    carriers.push({
-      name:                 name,
-      classification:       'Invoice Carrier',
-      primaryLane:          folderId !== '',
-      rootFolderConfigured: folderId !== '',
-      folderId:             folderId,
-      driveUrl:             folderId ? 'https://drive.google.com/drive/folders/' + folderId : '',
-      haulierLinked:        false,
-      haulierId:            '',
-      haulierUrl:           ''
-    });
-  });
-
-  allKeys.filter(function(k) { return k.endsWith('_HAULIER_ID'); }).forEach(function(k) {
-    var name    = k.replace('_HAULIER_ID', '');
-    var haulId  = String(config[k] || '').trim();
-    carriers.push({
-      name:                 name,
-      classification:       'Haulier RDC',
-      primaryLane:          haulId !== '',
-      rootFolderConfigured: false,
-      folderId:             '',
-      driveUrl:             '',
-      haulierLinked:        haulId !== '',
-      haulierId:            haulId,
-      haulierUrl:           haulId ? 'https://docs.google.com/spreadsheets/d/' + haulId : ''
-    });
-  });
-
-  // Sheet groups
-  var operationsSheets = [
-    getSheetSummary_(ss, 'Master Input',        'Master Input',        'Consolidated extracted invoice lines from all carriers', 'primary'),
-    getSheetSummary_(ss, 'TMST',                'TMST',                'Haulier reconciliation and store/tour match output',     'primary'),
-    getSheetSummary_(ss, 'Additonal Costs',     'Additional Costs',    'Non-base line items and surcharges',                     'secondary'),
-    getSheetSummary_(ss, 'Discrepancy Tracker', 'Discrepancy Tracker', 'Invoice lines with unresolved cost or data mismatches',  'warning')
-  ];
-
-  var configSheets = [
-    getSheetSummary_(ss, 'System Config',  'System Config',  'Carrier root folders, haulier IDs and processing settings', 'config'),
-    getSheetSummary_(ss, 'GL Config',      'GL Config',      'GL account mapping rules, cost centre codes and tolerances', 'config'),
-    getSheetSummary_(ss, 'RDC Aliases',    'RDC Aliases',    'RDC code alias mappings used to normalise sheet headers',   'config'),
-    getSheetSummary_(ss, 'Email Template', 'Email Template', 'Discrepancy notification email subject and body templates', 'config'),
-    getSheetSummary_(ss, 'Header Config',  'Header Config',  'Column header alias mappings for dynamic field detection',  'config')
-  ];
-
-  var viewerSheets = operationsSheets.concat(configSheets).filter(function(s) { return s.exists; });
-
-  // Readiness scoring
-  var rootCarriers           = carriers.filter(function(c) { return c.classification === 'Invoice Carrier'; });
-  var haulierCarriers        = carriers.filter(function(c) { return c.classification === 'Haulier RDC'; });
-  var configuredCarrierCount = rootCarriers.filter(function(c) { return c.rootFolderConfigured; }).length;
-  var primaryCarrierCount    = rootCarriers.length;
-  var linkedHaulierCount     = haulierCarriers.filter(function(c) { return c.haulierLinked; }).length;
-  var configReadyCount       = configSheets.filter(function(s) { return s.exists; }).length;
-  var missingConfigCount     = configSheets.filter(function(s) { return !s.exists; }).length;
-
-  var masterRows      = operationsSheets[0].rows;
-  var tmstRows        = operationsSheets[1].rows;
-  var discrepancies   = operationsSheets[3].rows;
-  var additionalCosts = operationsSheets[2].rows;
-  var discrepancyRate = masterRows > 0 ? Math.round((discrepancies / masterRows) * 100) : 0;
-
-  // Weighted readiness score: config 40%, carriers 30%, hauliers 30%
-  var cfgScore    = configReadyCount / 5;
-  var carrScore   = primaryCarrierCount  > 0 ? configuredCarrierCount / primaryCarrierCount  : 0;
-  var haulScore   = haulierCarriers.length > 0 ? linkedHaulierCount   / haulierCarriers.length : 1;
-  var readinessScore = Math.round(cfgScore * 40 + carrScore * 30 + haulScore * 30);
-
-  // Alerts
-  var alerts = [];
-  if (missingConfigCount > 0) {
-    alerts.push({ severity: 'critical', title: missingConfigCount + ' configuration tab(s) missing', detail: 'Run Initialize / Repair Config to create them.' });
-  }
-  if (configuredCarrierCount === 0 && primaryCarrierCount > 0) {
-    alerts.push({ severity: 'warning', title: 'No carrier root folders configured', detail: 'Add Drive folder IDs to System Config.' });
-  }
-  if (discrepancyRate > 20) {
-    alerts.push({ severity: 'warning', title: 'High discrepancy rate: ' + discrepancyRate + '%', detail: 'Review Discrepancy Tracker for open items.' });
-  }
-  if (configReadyCount === 5 && configuredCarrierCount > 0 && linkedHaulierCount > 0) {
-    alerts.push({ severity: 'success', title: 'System fully operational', detail: 'All config tabs present and at least one carrier and haulier configured.' });
-  }
-
-  var consoleSeed = [
-    { type: 'info',    message: 'Workbook: ' + ssName },
-    { type: 'info',    message: 'Config sheets present: ' + configReadyCount + '/5' },
-    { type: configuredCarrierCount > 0 ? 'success' : 'warning', message: 'Carrier lanes configured: ' + configuredCarrierCount + '/' + primaryCarrierCount },
-    { type: linkedHaulierCount     > 0 ? 'success' : 'warning', message: 'Haulier RDCs linked: ' + linkedHaulierCount + '/' + haulierCarriers.length },
-    { type: discrepancyRate        > 20 ? 'warning' : 'info',   message: 'Discrepancy rate: ' + discrepancyRate + '% (' + discrepancies + '/' + masterRows + ' rows)' }
-  ];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const getRowCount = (sheetName) => {
+    const sheet = ss.getSheetByName(sheetName);
+    return sheet ? Math.max(0, sheet.getLastRow() - 1) : 0;
+  };
+  
+  const config = getConfig();
+  // Get all carrier configurations that have valid folder IDs
+  const carriers = Object.keys(config)
+    .filter(k => k.endsWith('_ROOT_FOLDER') && config[k] !== '')
+    .map(k => k.replace('_ROOT_FOLDER', ''));
 
   return {
-    generatedAt:     new Date().toISOString(),
-    spreadsheetName: ssName,
-    sheetUrl:        ssUrl,
-    workbook:        { name: ssName, openUrl: ssUrl, embedUrl: 'https://docs.google.com/spreadsheets/d/' + ssId + '/htmlview' },
-    masterRows:      masterRows,
-    tmstRows:        tmstRows,
-    discrepancies:   discrepancies,
-    additionalCosts: additionalCosts,
-    carriers:        carriers,
-    operationsSheets: operationsSheets,
-    configSheets:    configSheets,
-    viewerSheets:    viewerSheets,
-    alerts:          alerts,
-    summary: {
-      readinessScore:        readinessScore,
-      configuredCarrierCount: configuredCarrierCount,
-      primaryCarrierCount:   primaryCarrierCount,
-      linkedHaulierCount:    linkedHaulierCount,
-      configReadyCount:      configReadyCount,
-      missingConfigCount:    missingConfigCount,
-      discrepancyRate:       discrepancyRate
-    },
-    consoleSeed: consoleSeed
+    masterRows: getRowCount('Master Input'),
+    discrepancies: getRowCount('Discrepancy Tracker'),
+    additionalCosts: getRowCount('Additonal Costs'),
+    carriers: carriers,
+    sheetUrl: ss.getUrl()
   };
-}
-
-// Called by the UI "Initialize / Repair Config" button — identical sheet creation
-// logic to setupConfigTab() but returns a structured result instead of a UI alert.
-function setupConfigWeb() {
-  var ss      = SpreadsheetApp.getActiveSpreadsheet();
-  var created = [];
-
-  // 1. System Config
-  if (!ss.getSheetByName('System Config')) {
-    var sc = ss.insertSheet('System Config');
-    sc.getRange(1, 1, 1, 3).setValues([['Setting Name', 'Value / ID', 'Description']]).setFontWeight('bold').setBackground('#d9ead3');
-    sc.getRange(2, 1, 8, 3).setValues([
-      ['FRG_HAULIER_ID', '1VyvVZ3BB2-tArldhuNKKBzfjU7FATVMJbtzhZP3P8pA', 'FRG Weekly Haulier Sheet ID'],
-      ['GRM_HAULIER_ID', '13lvErboGKp-cd06XV1PvhB7zSrCEXXVm0POZlWPBZV4', 'GRM Weekly Haulier Sheet ID'],
-      ['PYE_HAULIER_ID', '1AP_qyToLfhyuGihvfV3sUbLpj4WYx-wgAUVjtluHCoY', 'PYE Weekly Haulier Sheet ID'],
-      ['CRE_ROOT_FOLDER', '1BCbMyWUu0npRGIQvN1lRtrL5oBh1PdAi', 'Root Folder ID for CRE Invoices'],
-      ['HB_ROOT_FOLDER', '1awkIvApl6iyExTnrNTmD1Pt1oM1d-2GO', 'Root Folder ID for HB Invoices'],
-      ['SCH_ROOT_FOLDER', '', 'Root Folder ID for SCH Invoices (Optional)'],
-      ['WERNER_ROOT_FOLDER', '', 'Root Folder ID for Werner Invoices (Optional)'],
-      ['TEMP_PROCESSING_FOLDER', '', 'Optional: Folder ID for temp converted files']
-    ]);
-    sc.setColumnWidth(1, 250); sc.setColumnWidth(2, 350); sc.setColumnWidth(3, 400);
-    created.push('System Config');
-  }
-
-  // 2. GL Config
-  if (!ss.getSheetByName('GL Config')) {
-    var gc = ss.insertSheet('GL Config');
-    gc.getRange(1, 1, 1, 4).setValues([['Rule Type', 'Keyword / RDC', 'GL Account / Center Code / Value', 'Description']]).setFontWeight('bold').setBackground('#fff2cc');
-    gc.getRange(2, 1, 9, 4).setValues([
-      ['Cost Center', 'FRG', '50001', 'Fredericksburg Cost Center Code'],
-      ['Cost Center', 'GRM', '60001', 'Graham Cost Center Code'],
-      ['Cost Center', 'PYE', '70001', 'Perryville Cost Center Code'],
-      ['Category Mapping', 'toll', '471000, 47100002', 'Catches any line item containing "toll"'],
-      ['Category Mapping', 'fuel', '471000, 47100099', 'Catches any line item containing "fuel"'],
-      ['Default Category', 'BASE', '471000, 47100001', 'Base freight applied to all other costs'],
-      ['Ignore Rule', 'discount', '', 'Ignores line items containing this word'],
-      ['Ignore Rule', 'rebate', '', 'Ignores line items containing this word'],
-      ['Tolerance', 'MIN_COST', '0.01', 'Ignores line items below this value']
-    ]);
-    gc.setColumnWidth(1, 150); gc.setColumnWidth(2, 150); gc.setColumnWidth(3, 220); gc.setColumnWidth(4, 350);
-    created.push('GL Config');
-  }
-
-  // 3. RDC Aliases
-  if (!ss.getSheetByName('RDC Aliases')) {
-    var ra = ss.insertSheet('RDC Aliases');
-    ra.getRange(1, 1, 1, 2).setValues([['RDC Code', 'Aliases (Comma Separated)']]).setFontWeight('bold').setBackground('#cfe2f3');
-    ra.getRange(2, 1, 3, 2).setValues([
-      ['FRG', 'FREDERICKSBURG, FRG, VA, LIDL VA, _VA'],
-      ['GRM', 'GRAHAM, GRM, NC, LIDL NC, _NC, MEBANE'],
-      ['PYE', 'PERRYVILLE, PYE, MD, LIDL MD, _MD, PER']
-    ]);
-    ra.setColumnWidth(1, 150); ra.setColumnWidth(2, 500);
-    created.push('RDC Aliases');
-  }
-
-  // 4. Email Template
-  if (!ss.getSheetByName('Email Template')) {
-    var et = ss.insertSheet('Email Template');
-    et.getRange(1, 1, 1, 3).setValues([['Setting', 'Template Text', 'Available Variables']]).setFontWeight('bold').setBackground('#fce5cd');
-    et.getRange(2, 1, 3, 3).setValues([
-      ['Subject', 'Discrepancy Notice: Invoice {FileName}', '{FileName}, {CarrierName}'],
-      ['Greeting', 'Hello {CarrierName} Team,\n\nThe following items are showing as discrepancies. Please advise:', '{CarrierName}'],
-      ['Outro', 'Thank you.', '']
-    ]);
-    et.setColumnWidth(1, 150); et.setColumnWidth(2, 500); et.setColumnWidth(3, 200);
-    created.push('Email Template');
-  }
-
-  // 5. Header Config
-  if (!ss.getSheetByName('Header Config')) {
-    var hc = ss.insertSheet('Header Config');
-    hc.getRange(1, 1, 1, 2).setValues([['Target Field', 'Column Name Aliases (Comma Separated)']]).setFontWeight('bold').setBackground('#e6b8af');
-    hc.getRange(2, 1, 12, 2).setValues([
-      ['Date', 'date, pickup dt, delivery date'],
-      ['TU', 'tu, mb number'],
-      ['Store', 'store, dest location, dest city, destination name'],
-      ['Tour', 'tour, route'],
-      ['Miles', 'miles, total miles'],
-      ['NY Pay', 'ny pay, ny, new york, borough fee, dhu $ amt, stp $ amt'],
-      ['Tolls', 'toll, tol $ amt'],
-      ['Total Cost', 'total $ amt, total cost, cost, total'],
-      ['Shift', 'shift, shifts'],
-      ['Type', 'delivery type, tour type, shift type'],
-      ['Haulier Invoice', 'invoice, invoice #, invoice number'],
-      ['Haulier Amount', 'amount, actual amount, invoice amount, total cost']
-    ]);
-    hc.setColumnWidth(1, 150); hc.setColumnWidth(2, 500);
-    created.push('Header Config');
-  }
-
-  var msg = created.length > 0
-    ? 'Created ' + created.length + ' tab(s): ' + created.join(', ') + '.'
-    : 'All configuration tabs already present — no changes made.';
-  return { success: true, message: msg, created: created };
 }
 
 function uploadInvoiceWeb(base64Data, filename, mimeType, carrierKey) {
