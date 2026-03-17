@@ -26,7 +26,8 @@ function onOpen() {
 }
 
 // --- CONFIGURATION MANAGEMENT ---
-function setupConfigTab() {
+function setupConfigTab(isWebApp) {
+  isWebApp = isWebApp === true;  // normalize to boolean; default is false when omitted
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // 1. System Config
@@ -1788,7 +1789,8 @@ function clearTrackerWeb() {
 
 function setupConfigWeb() {
   try {
-    setupConfigTab();
+    // Pass `true` to indicate web-app context so `setupConfigTab` can avoid UI-only calls.
+    setupConfigTab(true);
     return { success: true, message: 'Configuration tabs initialized successfully.' };
   } catch (e) {
     return { success: false, message: 'Initialization error: ' + e.message };
