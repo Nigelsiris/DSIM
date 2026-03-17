@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IMT – Configuration</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <style>
+    :root {
+      --imt-accent: #3b82f6;
+      --imt-accent-light: #dbeafe;
+      --imt-success: #16a34a;
+      --imt-danger: #dc2626;
+      --imt-muted: #6b7280;
+    }
+
+    body { background: var(--background-color); }
+
+    /* ── Top nav ──────────────────────────────────────── */
+    .imt-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.5rem;
+      background: var(--card-background-color);
+      border-bottom: 1px solid var(--muted-border-color);
+      gap: 1rem;
+    }
+    .imt-nav-brand { font-size: 1.1rem; font-weight: 700; color: var(--imt-accent); text-decoration: none; }
+    .imt-nav-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .imt-nav-links a {
+      padding: 0.35rem 0.85rem;
+      border-radius: 0.375rem;
+      font-size: 0.9rem;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.15s;
+    }
+    .imt-nav-links a:hover  { background: var(--primary-focus); }
+    .imt-nav-links a.active { background: var(--imt-accent); color: #fff; }
+
+    /* ── Page layout ─────────────────────────────────── */
+    .imt-main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+
+    h1 { font-size: 1.4rem; margin-bottom: 1.5rem; }
+
+    /* ── Tab strip ───────────────────────────────────── */
+    .tab-strip {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--muted-border-color);
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+      flex-wrap: nowrap;
+    }
+    .tab-btn {
+      padding: 0.55rem 1.1rem;
+      font-size: 0.88rem;
+      font-weight: 500;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      color: var(--imt-muted);
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover  { color: var(--imt-accent); }
+    .tab-btn.active { color: var(--imt-accent); border-bottom-color: var(--imt-accent); }
+
+    /* ── Tab panels ──────────────────────────────────── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Generic editable table ──────────────────────── */
+    .cfg-table-wrap { overflow-x: auto; margin-bottom: 1rem; }
+    .cfg-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .cfg-table th,
+    .cfg-table td {
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--muted-border-color);
+      vertical-align: middle;
+    }
+    .cfg-table th { background: var(--card-background-color); font-weight: 600; white-space: nowrap; }
+    .cfg-table input[type="text"],
+    .cfg-table input[type="number"],
+    .cfg-table textarea,
+    .cfg-table select {
+      width: 100%;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.85rem;
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.25rem;
+      background: var(--background-color);
+      color: inherit;
+      box-sizing: border-box;
+    }
+    .cfg-table textarea { resize: vertical; min-height: 2.5rem; }
+
+    /* Delete row button */
+    .btn-del {
+      padding: 0.2rem 0.55rem;
+      background: var(--imt-danger);
+      color: #fff;
+      border: none;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+    .btn-del:hover { opacity: 0.85; }
+
+    /* ── Row actions bar ─────────────────────────────── */
+    .row-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .btn-add {
+      padding: 0.35rem 0.9rem;
+      font-size: 0.85rem;
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.375rem;
+      cursor: pointer;
+    }
+    .btn-add:hover { background: var(--primary-focus); }
+    .btn-save {
+      padding: 0.35rem 0.9rem;
+      font-size: 0.85rem;
+      background: var(--imt-accent);
+      color: #fff;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+    }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Active toggle ───────────────────────────────── */
+    .toggle-cell { text-align: center; }
+
+    /* ── Toast notification ──────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--imt-success);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      z-index: 9999;
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+    #toast.error { background: var(--imt-danger); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Spinner ─────────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 1.1em; height: 1.1em;
+      border: 3px solid var(--muted-border-color);
+      border-top-color: var(--imt-accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4em;
+    }
+
+    /* ── Help text ───────────────────────────────────── */
+    .help-text { font-size: 0.82rem; color: var(--imt-muted); margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <!-- ── Navigation ── -->
+  <nav class="imt-nav">
+    <span class="imt-nav-brand">📦 IMT</span>
+    <div class="imt-nav-links">
+      <a href="?page=dashboard">Dashboard</a>
+      <a href="?page=config" class="active">Configuration</a>
+    </div>
+  </nav>
+
+  <main class="imt-main">
+    <h1>⚙️ Configuration</h1>
+
+    <!-- ── Tab strip ── -->
+    <div class="tab-strip" role="tablist">
+      <button class="tab-btn active" onclick="switchTab('systemConfig',this)"  role="tab">System Config</button>
+      <button class="tab-btn"        onclick="switchTab('glConfig',this)"       role="tab">GL Config</button>
+      <button class="tab-btn"        onclick="switchTab('rdcAliases',this)"     role="tab">RDC Aliases</button>
+      <button class="tab-btn"        onclick="switchTab('emailTemplate',this)"  role="tab">Email Template</button>
+      <button class="tab-btn"        onclick="switchTab('headerConfig',this)"   role="tab">Header Config</button>
+      <button class="tab-btn"        onclick="switchTab('carrierCredits',this)" role="tab">Carrier Credits</button>
+      <button class="tab-btn"        onclick="switchTab('haulierCallbacks',this)" role="tab">Haulier Callbacks</button>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 1 – System Config                          -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-systemConfig" class="tab-panel active">
+      <p class="help-text">Global key/value settings used throughout the IMT. These values are available to all invoice generation functions.</p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('sysTbl','systemConfig')">+ Add Row</button>
+        <button class="btn-save" id="saveSystemConfig" onclick="saveTab('systemConfig')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="sysTbl">
+          <thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+          <tbody><tr><td colspan="3" style="text-align:center"><span class="spinner"></span> Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 2 – GL Config                              -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-glConfig" class="tab-panel">
+      <p class="help-text">General Ledger account codes used when posting invoices.</p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('glTbl','glConfig')">+ Add Row</button>
+        <button class="btn-save" id="saveGlConfig" onclick="saveTab('glConfig')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="glTbl">
+          <thead><tr><th>Account Code</th><th>Description</th><th>Type</th><th></th></tr></thead>
+          <tbody><tr><td colspan="4" style="text-align:center"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 3 – RDC Aliases                            -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-rdcAliases" class="tab-panel">
+      <p class="help-text">Map internal RDC codes to human-readable aliases shown on invoices and reports.</p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('rdcTbl','rdcAliases')">+ Add Row</button>
+        <button class="btn-save" id="saveRdcAliases" onclick="saveTab('rdcAliases')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="rdcTbl">
+          <thead><tr><th>RDC Code</th><th>Alias</th><th></th></tr></thead>
+          <tbody><tr><td colspan="3" style="text-align:center"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 4 – Email Template                         -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-emailTemplate" class="tab-panel">
+      <p class="help-text">
+        Configure the email template sent with invoices.
+        Use <code>{{invoiceNumber}}</code>, <code>{{period}}</code>, <code>{{carrierName}}</code>, <code>{{companyName}}</code> as placeholders.
+      </p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('etTbl','emailTemplate')">+ Add Row</button>
+        <button class="btn-save" id="saveEmailTemplate" onclick="saveTab('emailTemplate')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="etTbl">
+          <thead><tr><th>Field</th><th>Value</th><th></th></tr></thead>
+          <tbody><tr><td colspan="3" style="text-align:center"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 5 – Header Config                          -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-headerConfig" class="tab-panel">
+      <p class="help-text">Define the column headers for generated sheets (e.g. the Haulier Sheet). Changing these labels here will be picked up by the invoice generation process.</p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('hdrTbl','headerConfig')">+ Add Row</button>
+        <button class="btn-save" id="saveHeaderConfig" onclick="saveTab('headerConfig')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="hdrTbl">
+          <thead><tr><th>Sheet Name</th><th>Column</th><th>Header Label</th><th></th></tr></thead>
+          <tbody><tr><td colspan="4" style="text-align:center"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 6 – Carrier Credits (NEW)                  -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-carrierCredits" class="tab-panel">
+      <p class="help-text">
+        Configure credit rules for individual carriers (e.g. a backhaul credit applied when a carrier performs a return load).
+        Set a <strong>Credit Rate</strong> (flat amount or percentage) and optional load thresholds.
+        Only rows with <em>Active = Yes</em> will be applied during invoice generation.
+      </p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('ccTbl','carrierCredits')">+ Add Row</button>
+        <button class="btn-save" id="saveCarrierCredits" onclick="saveTab('carrierCredits')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="ccTbl">
+          <thead>
+            <tr>
+              <th>Carrier Name</th>
+              <th>Credit Type</th>
+              <th>Credit Rate</th>
+              <th>Min Loads</th>
+              <th>Max Loads</th>
+              <th>Active</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="8" style="text-align:center"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!--  TAB 7 – Haulier Callbacks (NEW)                -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div id="tab-haulierCallbacks" class="tab-panel">
+      <p class="help-text">
+        Define additional cost columns to inject into the Haulier Sheet for each carrier line.
+        Each callback has a <strong>Target Column</strong> and a <strong>Cost Formula</strong> (using <code>{row}</code> as the row placeholder).
+        Set <em>Applies To Carrier</em> to <code>ALL</code> for a universal callback or enter a specific carrier name.
+        Only <em>Active</em> callbacks will be written during invoice generation.
+      </p>
+      <div class="row-actions">
+        <button class="btn-add" onclick="addRow('cbTbl','haulierCallbacks')">+ Add Row</button>
+        <button class="btn-save" id="saveHaulierCallbacks" onclick="saveTab('haulierCallbacks')">Save</button>
+      </div>
+      <div class="cfg-table-wrap">
+        <table class="cfg-table" id="cbTbl">
+          <thead>
+            <tr>
+              <th>Callback Name</th>
+              <th>Target Sheet</th>
+              <th>Target Column</th>
+              <th>Applies To Carrier</th>
+              <th>Cost Formula</th>
+              <th>Active</th>
+              <th>Description</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="8" style="text-align:center"><span class="spinner"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast notification -->
+  <div id="toast"></div>
+
+  <script>
+    // ── Helpers ────────────────────────────────────────────────
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = isError ? 'error' : '';
+      t.style.display = 'block';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(function() { t.style.display = 'none'; }, 3000);
+    }
+
+    function input(type, val, placeholder) {
+      placeholder = placeholder || '';
+      return '<input type="' + type + '" value="' + escHtml(val) + '" placeholder="' + escHtml(placeholder) + '">';
+    }
+
+    function textarea(val, placeholder) {
+      return '<textarea placeholder="' + escHtml(placeholder || '') + '">' + escHtml(val) + '</textarea>';
+    }
+
+    function select(options, selected) {
+      return '<select>' + options.map(function(o) {
+        return '<option value="' + escHtml(o) + '"' + (o === selected ? ' selected' : '') + '>' + escHtml(o) + '</option>';
+      }).join('') + '</select>';
+    }
+
+    function delBtn() {
+      return '<button class="btn-del" onclick="delRow(this)">✕</button>';
+    }
+
+    function delRow(btn) {
+      btn.closest('tr').remove();
+    }
+
+    // ── Tab switching ──────────────────────────────────────────
+    function switchTab(id, btn) {
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.getElementById('tab-' + id).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // ── Row builders per tab ───────────────────────────────────
+    var rowBuilders = {
+      systemConfig: function(r) {
+        return '<tr>'
+          + '<td>' + input('text', r.key,   'e.g. invoicePrefix') + '</td>'
+          + '<td>' + input('text', r.value, 'value')              + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      },
+      glConfig: function(r) {
+        return '<tr>'
+          + '<td>' + input('text', r.accountCode, '4000')       + '</td>'
+          + '<td>' + input('text', r.description, 'Description') + '</td>'
+          + '<td>' + select(['Income','Expense','Balance'], r.type) + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      },
+      rdcAliases: function(r) {
+        return '<tr>'
+          + '<td>' + input('text', r.code,  'RDC01') + '</td>'
+          + '<td>' + input('text', r.alias, 'Alias') + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      },
+      emailTemplate: function(r) {
+        return '<tr>'
+          + '<td>' + input('text', r.field, 'e.g. subject') + '</td>'
+          + '<td>' + textarea(r.value, 'Template value…')   + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      },
+      headerConfig: function(r) {
+        return '<tr>'
+          + '<td>' + input('text', r.sheetName, 'Sheet name') + '</td>'
+          + '<td>' + input('text', r.column,    'A')          + '</td>'
+          + '<td>' + input('text', r.label,     'Column heading') + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      },
+      carrierCredits: function(r) {
+        return '<tr>'
+          + '<td>' + input('text',   r.carrier,    'Carrier name') + '</td>'
+          + '<td>' + select(['Backhaul','Volume','Loyalty','Other'], r.creditType) + '</td>'
+          + '<td>' + input('number', r.creditRate, '0.00')         + '</td>'
+          + '<td>' + input('number', r.minLoads,   '')             + '</td>'
+          + '<td>' + input('number', r.maxLoads,   '')             + '</td>'
+          + '<td class="toggle-cell">' + select(['Yes','No'], r.active ? 'Yes' : 'No') + '</td>'
+          + '<td>' + input('text', r.notes, 'Optional notes') + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      },
+      haulierCallbacks: function(r) {
+        return '<tr>'
+          + '<td>' + input('text', r.name,         'Callback name') + '</td>'
+          + '<td>' + input('text', r.targetSheet,  'Haulier Sheet') + '</td>'
+          + '<td>' + input('text', r.targetColumn, 'D')             + '</td>'
+          + '<td>' + input('text', r.appliesTo,    'ALL')           + '</td>'
+          + '<td>' + input('text', r.formula,      '=C{row}*0.05') + '</td>'
+          + '<td class="toggle-cell">' + select(['Yes','No'], r.active ? 'Yes' : 'No') + '</td>'
+          + '<td>' + input('text', r.description, 'Description') + '</td>'
+          + '<td>' + delBtn() + '</td>'
+          + '</tr>';
+      }
+    };
+
+    // ── Add empty row ──────────────────────────────────────────
+    var emptyRows = {
+      systemConfig:     { key: '', value: '' },
+      glConfig:         { accountCode: '', description: '', type: 'Income' },
+      rdcAliases:       { code: '', alias: '' },
+      emailTemplate:    { field: '', value: '' },
+      headerConfig:     { sheetName: 'Haulier Sheet', column: '', label: '' },
+      carrierCredits:   { carrier: '', creditType: 'Backhaul', creditRate: '0', minLoads: '', maxLoads: '', active: true, notes: '' },
+      haulierCallbacks: { name: '', targetSheet: 'Haulier Sheet', targetColumn: '', appliesTo: 'ALL', formula: '', active: true, description: '' }
+    };
+
+    var tableIds = {
+      systemConfig:     'sysTbl',
+      glConfig:         'glTbl',
+      rdcAliases:       'rdcTbl',
+      emailTemplate:    'etTbl',
+      headerConfig:     'hdrTbl',
+      carrierCredits:   'ccTbl',
+      haulierCallbacks: 'cbTbl'
+    };
+
+    function addRow(tblId, tab) {
+      var tbl = document.getElementById(tblId);
+      var tr = document.createElement('tr');
+      tr.innerHTML = rowBuilders[tab](emptyRows[tab]).replace(/^<tr>/, '').replace(/<\/tr>$/, '');
+      tbl.querySelector('tbody').appendChild(tr);
+    }
+
+    // ── Render rows from data ──────────────────────────────────
+    function renderRows(tab, data) {
+      var tblId = tableIds[tab];
+      var tbl   = document.getElementById(tblId);
+      var tbody = tbl.querySelector('tbody');
+      var colCount = tbl.querySelector('thead tr') ? tbl.querySelector('thead tr').children.length : 4;
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="' + colCount + '" style="text-align:center;color:var(--imt-muted)">No rows yet — click "+ Add Row" to begin.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(function(r) { return rowBuilders[tab](r); }).join('');
+    }
+
+    // ── Row extractors per tab ─────────────────────────────────
+    var rowExtractors = {
+      systemConfig: function(tr) {
+        var cells = tr.querySelectorAll('input,textarea');
+        return { key: cells[0].value.trim(), value: cells[1].value };
+      },
+      glConfig: function(tr) {
+        var inputs = tr.querySelectorAll('input');
+        var sel    = tr.querySelector('select');
+        return { accountCode: inputs[0].value.trim(), description: inputs[1].value, type: sel.value };
+      },
+      rdcAliases: function(tr) {
+        var cells = tr.querySelectorAll('input');
+        return { code: cells[0].value.trim(), alias: cells[1].value };
+      },
+      emailTemplate: function(tr) {
+        var field = tr.querySelector('input').value.trim();
+        var value = tr.querySelector('textarea').value;
+        return { field: field, value: value };
+      },
+      headerConfig: function(tr) {
+        var cells = tr.querySelectorAll('input');
+        return { sheetName: cells[0].value, column: cells[1].value.trim(), label: cells[2].value };
+      },
+      carrierCredits: function(tr) {
+        var inputs  = tr.querySelectorAll('input');
+        var selects = tr.querySelectorAll('select');
+        return {
+          carrier:    inputs[0].value.trim(),
+          creditType: selects[0].value,
+          creditRate: inputs[1].value,
+          minLoads:   inputs[2].value,
+          maxLoads:   inputs[3].value,
+          active:     selects[1].value === 'Yes',
+          notes:      inputs[4].value
+        };
+      },
+      haulierCallbacks: function(tr) {
+        var inputs  = tr.querySelectorAll('input');
+        var selects = tr.querySelectorAll('select');
+        return {
+          name:         inputs[0].value.trim(),
+          targetSheet:  inputs[1].value,
+          targetColumn: inputs[2].value.trim(),
+          appliesTo:    inputs[3].value.trim(),
+          formula:      inputs[4].value,
+          active:       selects[0].value === 'Yes',
+          description:  inputs[5].value
+        };
+      }
+    };
+
+    // ── Save functions map ─────────────────────────────────────
+    var serverSaveFns = {
+      systemConfig:     'saveSystemConfig',
+      glConfig:         'saveGlConfig',
+      rdcAliases:       'saveRdcAliases',
+      emailTemplate:    'saveEmailTemplate',
+      headerConfig:     'saveHeaderConfig',
+      carrierCredits:   'saveCarrierCredits',
+      haulierCallbacks: 'saveHaulierCallbacks'
+    };
+
+    function saveTab(tab) {
+      var tblId  = tableIds[tab];
+      var rows   = [];
+      var trs    = document.querySelectorAll('#' + tblId + ' tbody tr');
+      var ext    = rowExtractors[tab];
+      trs.forEach(function(tr) {
+        // Skip loading / empty-state rows
+        if (tr.querySelector('input') || tr.querySelector('textarea') || tr.querySelector('select')) {
+          rows.push(ext(tr));
+        }
+      });
+
+      var btn = document.getElementById('save' + tab.charAt(0).toUpperCase() + tab.slice(1));
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+          if (r && r.success) {
+            showToast('✓ ' + tab + ' saved successfully.');
+          } else {
+            showToast('Save failed.', true);
+          }
+        })
+        .withFailureHandler(function(e) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+          showToast('Error: ' + e.message, true);
+        })
+        [serverSaveFns[tab]](rows);
+    }
+
+    // ── Bootstrap: load all config in one call ─────────────────
+    google.script.run
+      .withSuccessHandler(function(cfg) {
+        renderRows('systemConfig',     cfg.systemConfig);
+        renderRows('glConfig',         cfg.glConfig);
+        renderRows('rdcAliases',       cfg.rdcAliases);
+        renderRows('emailTemplate',    cfg.emailTemplate);
+        renderRows('headerConfig',     cfg.headerConfig);
+        renderRows('carrierCredits',   cfg.carrierCredits);
+        renderRows('haulierCallbacks', cfg.haulierCallbacks);
+      })
+      .withFailureHandler(function(e) {
+        showToast('Could not load config: ' + e.message, true);
+        // Show empty tables so user can still add rows
+        ['systemConfig','glConfig','rdcAliases','emailTemplate','headerConfig','carrierCredits','haulierCallbacks']
+          .forEach(function(tab) { renderRows(tab, []); });
+      })
+      .getAllConfig();
+  </script>
+</body>
+</html>
