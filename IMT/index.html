@@ -1080,8 +1080,8 @@ function saveSysConfig() {
 }
 
 /* ── GL Config ── */
-var GL_RULE_TYPES = ['Cost Center','Category Mapping','Default Category','Ignore Rule','Tolerance'];
 function makeGlCfgRow(vals) {
+  var GL_RULE_TYPES = ['Cost Center','Category Mapping','Default Category','Ignore Rule','Tolerance'];
   var sel = GL_RULE_TYPES.map(function(t) {
     return '<option value="' + t + '"' + (vals[0] === t ? ' selected' : '') + '>' + t + '</option>';
   }).join('');
@@ -1192,13 +1192,9 @@ function saveHeaderConfig() {
 }
 
 // ── AUTO-LOAD CONFIG WHEN NAVIGATING TO CONFIG VIEW ──
-(function() {
-  var origSwitch = switchView;
-  switchView = function(id) {
-    origSwitch(id);
-    if (id === 'config' && !_configLoaded) { _configLoaded = true; loadConfigData(); }
-  };
-})();
+document.querySelector('[data-view="config"]').addEventListener('click', function() {
+  if (!_configLoaded) { _configLoaded = true; loadConfigData(); }
+});
 var _configLoaded = false;
 
 // ── BOOT ───────────────────────────────────────────────
