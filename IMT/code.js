@@ -1823,6 +1823,18 @@ function getConfigData() {
 
 function saveConfigData(sheetName, rows) {
   try {
+    // Only allow saving to known configuration sheets
+    const editableSheets = [
+      'System Config',
+      'GL Config',
+      'RDC Aliases',
+      'Email Template',
+      'Header Config'
+    ];
+    if (editableSheets.indexOf(sheetName) === -1) {
+      return { success: false, message: `Saving to sheet "${sheetName}" is not allowed.` };
+    }
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
