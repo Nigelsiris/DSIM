@@ -116,7 +116,7 @@
   text-align: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .toast.is-visible {
@@ -138,10 +138,18 @@
   justify-content: center;
   z-index: 2500;
   padding: 1rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .modal-overlay.is-visible {
   display: flex;
+  animation: dsim-modal-bg 0.2s ease forwards;
+}
+
+@keyframes dsim-modal-bg {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .modal-content {
@@ -151,6 +159,13 @@
   border-radius: 0.75rem;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
   width: min(500px, 100%);
+  transform: scale(0.95) translateY(8px);
+  animation: dsim-modal-in 0.25s ease forwards;
+}
+
+@keyframes dsim-modal-in {
+  from { transform: scale(0.95) translateY(8px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
 }
 
 [data-theme="dark"] .modal-content {
@@ -164,4 +179,21 @@
     margin: 0 0 1rem;
     justify-content: flex-end;
   }
+}
+
+/* Smooth global interactions */
+button, .btn, [role="button"] {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background-color 0.2s ease;
+}
+
+button:active:not(:disabled), .btn:active:not(:disabled), [role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+input, select, textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+article {
+  transition: box-shadow 0.2s ease;
 }

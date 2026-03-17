@@ -99,6 +99,120 @@
         .field-optional input {
             background: var(--pico-muted-border-color);
         }
+        
+        /* Pre-Load mode styling */
+        .preload-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+        }
+        
+        .preload-toggle:hover {
+            background: #bbdefb;
+        }
+        
+        .preload-toggle input[type="checkbox"] {
+            width: 1.5rem;
+            height: 1.5rem;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .preload-toggle label {
+            margin: 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #1565c0;
+        }
+        
+        .preload-toggle small {
+            color: #1976d2;
+        }
+        
+        .preload-active {
+            background: #90caf9;
+            border-color: #1565c0;
+        }
+        
+        /* Morning Mode indicator */
+        .morning-mode-banner {
+            background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+            border: 2px solid #fbc02d;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .morning-mode-banner span {
+            font-weight: 600;
+            color: #f57f17;
+        }
+        
+        .morning-mode-banner small {
+            color: #f9a825;
+        }
+        
+        /* Announcements styles */
+        .announcements-container {
+            margin-bottom: 1rem;
+        }
+        .announcement-banner {
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        .announcement-banner.priority-normal {
+            background: #e3f2fd;
+            border: 1px solid #64b5f6;
+        }
+        .announcement-banner.priority-important {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+        }
+        .announcement-banner.priority-urgent {
+            background: #ffebee;
+            border: 2px solid #f44336;
+            animation: pulse-urgent 2s infinite;
+        }
+        @keyframes pulse-urgent {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(244, 67, 54, 0); }
+        }
+        .announcement-banner .announcement-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        .announcement-banner .announcement-content {
+            flex: 1;
+        }
+        .announcement-banner .announcement-message {
+            font-weight: 500;
+            margin: 0;
+            white-space: pre-wrap;
+        }
+        .announcement-banner .announcement-meta {
+            font-size: 0.75rem;
+            color: var(--muted-color);
+            margin-top: 0.25rem;
+        }
+        .announcement-banner.priority-urgent .announcement-message {
+            color: #c62828;
+        }
+        .announcement-banner.priority-important .announcement-message {
+            color: #e65100;
+        }
     </style>
 </head>
 <body>
@@ -111,8 +225,26 @@
             
             <h2>Driver Check-Out</h2>
             <p>Welcome, <b><?!= username; ?></b>. Please confirm your details to check out an EPJ.</p>
+            
+            <!-- Announcements Container -->
+            <div id="announcementsContainer" class="announcements-container" style="display:none;"></div>
+            
+            <!-- Morning Mode Banner (shown between 6am-12pm) -->
+            <div id="morningModeBanner" class="morning-mode-banner" style="display:none;">
+                <span>☀️ Morning Mode</span>
+                <small>All EPJs available including store delivery units</small>
+            </div>
 
             <form id="checkOutForm">
+                <!-- Pre-Load Toggle -->
+                <div class="preload-toggle" id="preloadToggle">
+                    <input type="checkbox" id="preloadCheckbox" name="preload">
+                    <div>
+                        <label for="preloadCheckbox">Pre-Load (No EPJ Required)</label><br>
+                        <small>For drivers who don't need an EPJ for their route</small>
+                    </div>
+                </div>
+                
                 <!-- Overspill Toggle -->
                 <div class="overspill-toggle" id="overspillToggle">
                     <input type="checkbox" id="overspillCheckbox" name="overspill">
@@ -128,7 +260,7 @@
                 </div>
                 <div class="grid">
                     <label id="trailerLabel">Trailer Number<input type="text" id="trailerNumber" name="trailerNumber" required></label>
-                    <label id="routeLabel">Route (Store Numbers)<input type="text" id="route" name="route" placeholder="1234 / 5678 / 9012" required></label>
+                    <label id="routeLabel">Route<input type="text" id="route" name="route" placeholder="e.g. 1234 / ABC / Zone-5" required></label>
                 </div>
                 
                 <hr>
@@ -161,7 +293,9 @@
             var _token = (typeof sessionToken !== 'undefined' && sessionToken) ? sessionToken : "<?= token ?>";
             var _epjInfoMap = {};
             var _availableEpjsData = []; // Stores objects with epj and storeOnly flag
+            var _allEpjsData = []; // All EPJs including store-only (for morning mode)
             var _zoneOptionsHtml = '';
+            var _isMorningMode = false;
 
             var zoneFilter = document.getElementById('zoneFilter');
             var epjSelect = document.getElementById('epjNumber');
@@ -171,39 +305,83 @@
             // Disable form until data loads
             if (submitBtn) submitBtn.disabled = true;
             if (zoneFilter) zoneFilter.disabled = true;
+            
+            // Check for Morning Mode (6am - 12pm)
+            var currentHour = new Date().getHours();
+            _isMorningMode = (currentHour >= 6 && currentHour < 12);
+            if (_isMorningMode) {
+                var banner = document.getElementById('morningModeBanner');
+                if (banner) banner.style.display = 'flex';
+            }
 
-            // Route input auto-formatting (adds slashes after every 4 digits)
+            // Route input - allow any characters (letters, numbers, slashes, etc.)
             var routeInput = document.getElementById('route');
-            if (routeInput) {
-                routeInput.addEventListener('input', function(e) {
-                    // Don't auto-format if overspill is checked
-                    var overspillCheckbox = document.getElementById('overspillCheckbox');
-                    if (overspillCheckbox && overspillCheckbox.checked) return;
+            
+            // Pre-Load toggle functionality
+            var preloadCheckbox = document.getElementById('preloadCheckbox');
+            var preloadToggle = document.getElementById('preloadToggle');
+            var truckInput = document.getElementById('truckNumber');
+            var trailerInput = document.getElementById('trailerNumber');
+            var truckLabel = document.getElementById('truckLabel');
+            var trailerLabel = document.getElementById('trailerLabel');
+            var epjSection = document.getElementById('epjSection');
+            var routeLabel = document.getElementById('routeLabel');
+            
+            if (preloadCheckbox) {
+                preloadCheckbox.addEventListener('change', function() {
+                    var isPreload = this.checked;
                     
-                    var value = e.target.value;
-                    // Remove all non-digits
-                    var digitsOnly = value.replace(/\D/g, '');
-                    // Split into groups of 4
-                    var formatted = '';
-                    for (var i = 0; i < digitsOnly.length; i++) {
-                        if (i > 0 && i % 4 === 0) {
-                            formatted += ' / ';
-                        }
-                        formatted += digitsOnly[i];
+                    // Toggle visual state
+                    if (preloadToggle) {
+                        preloadToggle.classList.toggle('preload-active', isPreload);
                     }
-                    e.target.value = formatted;
+                    
+                    // Disable overspill if preload is checked
+                    var overspillCheckbox = document.getElementById('overspillCheckbox');
+                    if (overspillCheckbox) {
+                        if (isPreload) {
+                            overspillCheckbox.checked = false;
+                            overspillCheckbox.disabled = true;
+                            var overspillToggle = document.getElementById('overspillToggle');
+                            if (overspillToggle) overspillToggle.style.opacity = '0.5';
+                        } else {
+                            overspillCheckbox.disabled = false;
+                            var overspillToggle = document.getElementById('overspillToggle');
+                            if (overspillToggle) overspillToggle.style.opacity = '1';
+                        }
+                    }
+                    
+                    // Make truck/trailer optional when Pre-Load is checked, but keep values
+                    if (truckInput) {
+                        truckInput.required = !isPreload;
+                    }
+                    if (trailerInput) {
+                        trailerInput.required = !isPreload;
+                    }
+                    if (truckLabel) truckLabel.classList.toggle('field-optional', isPreload);
+                    if (trailerLabel) trailerLabel.classList.toggle('field-optional', isPreload);
+                    
+                    // Hide/show EPJ selection for preload (EPJ becomes optional)
+                    if (epjSection) {
+                        // Don't hide, but make it optional
+                        if (isPreload) {
+                            // Reset to show N/A option
+                            updateEpjList(true);
+                        } else {
+                            updateEpjList(false);
+                        }
+                    }
+                    
+                    // Update EPJ select required attribute
+                    if (epjSelect) {
+                        epjSelect.required = !isPreload;
+                    }
                 });
             }
             
             // Overspill toggle functionality
             var overspillCheckbox = document.getElementById('overspillCheckbox');
             var overspillToggle = document.getElementById('overspillToggle');
-            var truckInput = document.getElementById('truckNumber');
-            var trailerInput = document.getElementById('trailerNumber');
-            var truckLabel = document.getElementById('truckLabel');
-            var trailerLabel = document.getElementById('trailerLabel');
-            var routeLabel = document.getElementById('routeLabel');
-            var epjSection = document.getElementById('epjSection');
             
             if (overspillCheckbox) {
                 overspillCheckbox.addEventListener('change', function() {
@@ -257,17 +435,23 @@
                         return;
                     }
                     
-                    // Process EPJ data - filter OUT store-only EPJs (they can only be checked out from check-in form)
-                    _availableEpjsData = data.availableEpjs
+                    // Store all EPJs for morning mode
+                    _allEpjsData = data.availableEpjs
                         .map(function(item) {
                             if (typeof item === 'string') {
                                 return { epj: item, storeOnly: false };
                             }
                             return item;
-                        })
-                        .filter(function(item) {
+                        });
+                    
+                    // Process EPJ data - in Morning Mode, include all EPJs; otherwise filter out store-only
+                    if (_isMorningMode) {
+                        _availableEpjsData = _allEpjsData; // Include store-only EPJs
+                    } else {
+                        _availableEpjsData = _allEpjsData.filter(function(item) {
                             return !item.storeOnly; // Exclude store-only EPJs
                         });
+                    }
                     
                     _epjInfoMap = data.epjInfoMap;
                     _zoneOptionsHtml = data.zoneOptions;
@@ -291,6 +475,75 @@
 
                     // Initialize EPJ list
                     updateEpjList();
+                    
+                    // Apply site-wide defaults from admin settings
+                    if (data.siteSettings) {
+                        var ss = data.siteSettings;
+                        var currentHour = new Date().getHours();
+                        
+                        // Determine if overspill should be defaulted on
+                        // Schedule takes priority when set (start/end >= 0)
+                        var shouldDefaultOverspill = false;
+                        if (ss.overspillStartHour >= 0 && ss.overspillEndHour >= 0) {
+                            // Schedule is configured — check if current hour is within range
+                            if (ss.overspillStartHour <= ss.overspillEndHour) {
+                                // Same-day range (e.g. 2am-2pm)
+                                shouldDefaultOverspill = (currentHour >= ss.overspillStartHour && currentHour < ss.overspillEndHour);
+                            } else {
+                                // Overnight range (e.g. 10pm-6am)
+                                shouldDefaultOverspill = (currentHour >= ss.overspillStartHour || currentHour < ss.overspillEndHour);
+                            }
+                        } else {
+                            // No schedule — fall back to simple toggle
+                            shouldDefaultOverspill = !!ss.defaultOverspill;
+                        }
+                        
+                        if (shouldDefaultOverspill && overspillCheckbox && !overspillCheckbox.checked) {
+                            overspillCheckbox.checked = true;
+                            overspillCheckbox.dispatchEvent(new Event('change'));
+                        }
+                        
+                        // Determine if preload should be defaulted on
+                        var shouldDefaultPreload = false;
+                        if (ss.preloadStartHour >= 0 && ss.preloadEndHour >= 0) {
+                            if (ss.preloadStartHour <= ss.preloadEndHour) {
+                                shouldDefaultPreload = (currentHour >= ss.preloadStartHour && currentHour < ss.preloadEndHour);
+                            } else {
+                                shouldDefaultPreload = (currentHour >= ss.preloadStartHour || currentHour < ss.preloadEndHour);
+                            }
+                        } else {
+                            shouldDefaultPreload = !!ss.defaultPreload;
+                        }
+                        
+                        if (shouldDefaultPreload && preloadCheckbox && !preloadCheckbox.checked) {
+                            preloadCheckbox.checked = true;
+                            preloadCheckbox.dispatchEvent(new Event('change'));
+                        }
+                        // Update morning mode hours from config
+                        if (ss.morningModeStartHour != null && ss.morningModeEndHour != null) {
+                            var h = new Date().getHours();
+                            _isMorningMode = (h >= ss.morningModeStartHour && h < ss.morningModeEndHour);
+                            var banner = document.getElementById('morningModeBanner');
+                            if (banner) banner.style.display = _isMorningMode ? 'flex' : 'none';
+                            if (_isMorningMode) {
+                                _availableEpjsData = _allEpjsData;
+                            } else {
+                                _availableEpjsData = _allEpjsData.filter(function(item) { return !item.storeOnly; });
+                            }
+                            updateEpjList();
+                        }
+                        // Show site message banner if set
+                        if (ss.siteMessage) {
+                            var msgBanner = document.createElement('div');
+                            msgBanner.className = 'announcement-banner priority-important';
+                            msgBanner.innerHTML = '<span class="announcement-icon">📢</span><div class="announcement-content"><p class="announcement-message">' + escapeHtmlCheckout(ss.siteMessage) + '</p></div>';
+                            var announcementsContainer = document.getElementById('announcementsContainer');
+                            if (announcementsContainer) {
+                                announcementsContainer.prepend(msgBanner);
+                                announcementsContainer.style.display = 'block';
+                            }
+                        }
+                    }
                 })
                 .withFailureHandler(function(error) {
                     var feedback = document.getElementById('feedback');
@@ -300,14 +553,57 @@
                     if (submitBtn) submitBtn.disabled = true;
                 })
                 .getCheckoutFormData({token: _token});
+            
+            // Load announcements for drivers
+            google.script.run
+                .withSuccessHandler(function(announcements) {
+                    var container = document.getElementById('announcementsContainer');
+                    if (!container || !announcements || announcements.length === 0) return;
+                    
+                    var html = '';
+                    announcements.forEach(function(ann) {
+                        var priorityClass = 'priority-' + ann.priority;
+                        var icon = ann.priority === 'urgent' ? '⚠️' : (ann.priority === 'important' ? '📣' : '📢');
+                        
+                        html += '<div class="announcement-banner ' + priorityClass + '">';
+                        html += '<span class="announcement-icon">' + icon + '</span>';
+                        html += '<div class="announcement-content">';
+                        html += '<p class="announcement-message">' + escapeHtmlCheckout(ann.message) + '</p>';
+                        html += '<div class="announcement-meta">Posted ' + ann.created + '</div>';
+                        html += '</div>';
+                        html += '</div>';
+                    });
+                    
+                    container.innerHTML = html;
+                    container.style.display = 'block';
+                })
+                .withFailureHandler(function(err) {
+                    console.log('Could not load announcements:', err);
+                })
+                .getActiveAnnouncements({token: _token});
+            
+            function escapeHtmlCheckout(text) {
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            }
 
-            function updateEpjList() {
+            function updateEpjList(includeNaOption) {
                 var selectedZone = zoneFilter ? zoneFilter.value : 'All';
                 if (epjSelect) {
                     epjSelect.innerHTML = ''; 
                     epjSelect.disabled = false;
                 }
                 var epjsShown = 0;
+                
+                // Add N/A option at top if in Pre-Load mode
+                if (includeNaOption && epjSelect) {
+                    var naOption = document.createElement('option');
+                    naOption.value = 'N/A - None Required';
+                    naOption.textContent = 'N/A - None Required';
+                    epjSelect.appendChild(naOption);
+                    epjsShown++;
+                }
                 
                 _availableEpjsData.forEach(function(item) {
                     var epj = item.epj;
@@ -319,7 +615,12 @@
                     if (matchesZone && epjSelect) {
                         var option = document.createElement('option');
                         option.value = epj;
-                        option.textContent = epj;
+                        // In morning mode, indicate store-only EPJs
+                        if (_isMorningMode && item.storeOnly) {
+                            option.textContent = epj + ' [Store]';
+                        } else {
+                            option.textContent = epj;
+                        }
                         epjSelect.appendChild(option);
                         epjsShown++;
                     }
@@ -332,17 +633,24 @@
                     epjSelect.appendChild(option);
                 }
                 
-                if (epjSelect) epjSelect.value = ''; 
+                if (epjSelect) epjSelect.value = includeNaOption ? 'N/A - None Required' : ''; 
                 if (infoDisplay) infoDisplay.innerHTML = '<small>Select an EPJ to see its last reported status.</small>';
             }
             
             if (zoneFilter) {
-                zoneFilter.addEventListener('change', updateEpjList);
+                zoneFilter.addEventListener('change', function() {
+                    var isPreload = preloadCheckbox && preloadCheckbox.checked;
+                    updateEpjList(isPreload);
+                });
             }
             
             if (epjSelect) {
                 epjSelect.addEventListener('change', function() {
                     var selectedEpj = this.value;
+                    if (selectedEpj === 'N/A - None Required') {
+                        if (infoDisplay) infoDisplay.innerHTML = '<small>No EPJ will be assigned for this trip.</small>';
+                        return;
+                    }
                     if (selectedEpj && _epjInfoMap[selectedEpj]) {
                         var info = _epjInfoMap[selectedEpj];
                         var epjData = _availableEpjsData.find(function(item) { return item.epj === selectedEpj; });
@@ -364,18 +672,26 @@
                 checkOutForm.addEventListener('submit', function(e) {
                     e.preventDefault();
                     var isOverspill = overspillCheckbox && overspillCheckbox.checked;
+                    var isPreload = preloadCheckbox && preloadCheckbox.checked;
+                    var selectedEpj = epjSelect ? epjSelect.value : '';
+                    
                     var formData = {
                         token: _token,
                         driverName: document.getElementById('driverName') ? document.getElementById('driverName').value : '',
                         truckNumber: document.getElementById('truckNumber') ? document.getElementById('truckNumber').value : '',
                         trailerNumber: document.getElementById('trailerNumber') ? document.getElementById('trailerNumber').value : '',
                         route: document.getElementById('route') ? document.getElementById('route').value : '',
-                        epjNumber: isOverspill ? '' : (epjSelect ? epjSelect.value : ''),
+                        epjNumber: isOverspill ? '' : selectedEpj,
                         faultReport: document.getElementById('faultReport') ? document.getElementById('faultReport').value : '',
-                        isOverspill: isOverspill
+                        isOverspill: isOverspill,
+                        isPreload: isPreload
                     };
-                    // Only require EPJ if not overspill
-                    if (!isOverspill && !formData.epjNumber) { alert('Please select an EPJ.'); return; }
+                    
+                    // Only require EPJ if not overspill and not preload (or preload with no selection)
+                    if (!isOverspill && !isPreload && !formData.epjNumber) { 
+                        alert('Please select an EPJ.'); 
+                        return; 
+                    }
                     
                     // Show loading state on button
                     if (submitBtn) {
@@ -409,16 +725,8 @@
                     if (feedback) feedback.innerText = '';
                     alert(message);
                 } else {
-                    var article = document.querySelector('article');
-                    if (article) {
-                        article.innerHTML = 
-                            '<h2>Success!</h2>' +
-                            '<p>' + message + '</p>' +
-                            '<p>Returning to login screen...</p>';
-                    }
-                    setTimeout(function() {
-                        if (typeof logout === 'function') logout();
-                    }, 2000);
+                    // Instant redirect — no 2-second wait
+                    if (typeof logout === 'function') logout();
                 }
             }
             
