@@ -1616,23 +1616,145 @@ function doGet(e) {
 
 function getDashboardData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const getRowCount = (sheetName) => {
-    const sheet = ss.getSheetByName(sheetName);
-    return sheet ? Math.max(0, sheet.getLastRow() - 1) : 0;
+  const getRowCount = (name) => {
+    const s = ss.getSheetByName(name);
+    return s ? Math.max(0, s.getLastRow() - 1) : 0;
   };
-  
-  const config = getConfig();
-  // Get all carrier configurations that have valid folder IDs
-  const carriers = Object.keys(config)
-    .filter(k => k.endsWith('_ROOT_FOLDER') && config[k] !== '')
-    .map(k => k.replace('_ROOT_FOLDER', ''));
+
+  let config = {};
+  let configLoadOk = false;
+  try { config = getConfig(); configLoadOk = true; } catch (e) {}
+
+  // --- Build carrier list (primary RDCs first, then dynamic carriers) ---
+  const primaryRdcs = ['FRG', 'GRM', 'PYE'];
+  const seen = new Set();
+  const carriers = [];
+
+  primaryRdcs.forEach(rdc => {
+    seen.add(rdc);
+    const folderId  = String(config[rdc + '_ROOT_FOLDER']  || '').trim();
+    const haulierId = String(config[rdc + '_HAULIER_ID']   || '').trim();
+    carriers.push({
+      name: rdc,
+      classification: 'Primary RDC',
+      primaryLane: true,
+      rootFolderConfigured: !!folderId,
+      haulierLinked: !!haulierId,
+      folderId: folderId,
+      haulierId: haulierId,
+      driveUrl:   folderId  ? `https://drive.google.com/drive/folders/${folderId}`  : '',
+      haulierUrl: haulierId ? `https://docs.google.com/spreadsheets/d/${haulierId}` : ''
+    });
+  });
+
+  Object.keys(config).forEach(k => {
+    if (!k.endsWith('_ROOT_FOLDER')) return;
+    const name = k.replace('_ROOT_FOLDER', '');
+    if (seen.has(name)) return;
+    seen.add(name);
+    const folderId  = String(config[k] || '').trim();
+    const haulierId = String(config[name + '_HAULIER_ID'] || '').trim();
+    carriers.push({
+      name: name,
+      classification: 'Dynamic Carrier',
+      primaryLane: false,
+      rootFolderConfigured: !!folderId,
+      haulierLinked: !!haulierId,
+      folderId: folderId,
+      haulierId: haulierId,
+      driveUrl:   folderId  ? `https://drive.google.com/drive/folders/${folderId}`  : '',
+      haulierUrl: haulierId ? `https://docs.google.com/spreadsheets/d/${haulierId}` : ''
+    });
+  });
+
+  // --- Readiness metrics ---
+  const cfgTabs = ['System Config', 'GL Config', 'RDC Aliases', 'Email Template', 'Header Config'];
+  const configReadyCount       = cfgTabs.filter(n => !!ss.getSheetByName(n)).length;
+  const configuredCarrierCount = carriers.filter(c => c.rootFolderConfigured).length;
+  const linkedHaulierCount     = carriers.filter(c => c.haulierLinked).length;
+
+  const masterRows    = getRowCount('Master Input');
+  const tmstRows      = getRowCount('TMST');
+  const discrepancies = getRowCount('Discrepancy Tracker');
+  const addlCosts     = getRowCount('Additonal Costs');
+  const discRate      = masterRows > 0 ? Math.round((discrepancies / masterRows) * 100) : 0;
+
+  let score = 0;
+  score += Math.round((configReadyCount / 5) * 40);
+  score += Math.round((Math.min(configuredCarrierCount, 2) / 2) * 30);
+  score += Math.round((Math.min(linkedHaulierCount, 2) / 2) * 30);
+
+  // --- Alerts ---
+  const alerts = [];
+  if (!configLoadOk || configReadyCount < 5) {
+    alerts.push({ severity: 'warning', title: 'Configuration Incomplete', detail: `${5 - configReadyCount} config tab(s) missing. Run Initialization.` });
+  }
+  if (configuredCarrierCount === 0) {
+    alerts.push({ severity: 'critical', title: 'No Carriers Configured', detail: 'Add at least one carrier root folder in System Config.' });
+  } else if (configReadyCount >= 5) {
+    alerts.push({ severity: 'success', title: 'System Ready', detail: `${configuredCarrierCount} carrier(s) configured, ${linkedHaulierCount} haulier link(s) active.` });
+  }
+  if (discRate > 20) {
+    alerts.push({ severity: 'warning', title: 'High Discrepancy Rate', detail: `${discRate}% of master rows have unresolved discrepancies.` });
+  }
+
+  // --- Sheet summary helper ---
+  const sheetObj = (name, label, desc) => {
+    const s   = ss.getSheetByName(name);
+    const rows = s ? Math.max(0, s.getLastRow() - 1) : 0;
+    const gid  = s ? s.getSheetId() : null;
+    return {
+      name, label, description: desc,
+      exists: !!s, rows,
+      openUrl:  s ? `${ss.getUrl()}#gid=${gid}` : null,
+      embedUrl: s ? `https://docs.google.com/spreadsheets/d/${ss.getId()}/htmlembed?gid=${gid}` : null
+    };
+  };
+
+  const operationsSheets = [
+    sheetObj('Master Input',        'Master Input',        'All extracted invoice line items'),
+    sheetObj('TMST',                'TMST',                'TU reconciliation with haulier data'),
+    sheetObj('Additonal Costs',     'Additional Costs',    'Non-base cost line items'),
+    sheetObj('Discrepancy Tracker', 'Discrepancy Tracker', 'Flagged mismatches requiring review')
+  ];
+
+  const configSheets = [
+    sheetObj('System Config',  'System Config',  'Carrier folders and haulier sheet IDs'),
+    sheetObj('GL Config',      'GL Config',      'Cost categories, ignore rules and tolerance'),
+    sheetObj('RDC Aliases',    'RDC Aliases',    'RDC code name aliases for file matching'),
+    sheetObj('Email Template', 'Email Template', 'Discrepancy notification email template'),
+    sheetObj('Header Config',  'Header Config',  'Column name aliases for field matching')
+  ];
+
+  const viewerSheets = operationsSheets.filter(s => s.exists);
+
+  // --- Console seed ---
+  const consoleSeed = [];
+  if (configReadyCount < 5) consoleSeed.push({ message: `${5 - configReadyCount} configuration tab(s) missing — run Initialization.`, type: 'warning' });
+  if (masterRows > 0) consoleSeed.push({ message: `Master Input: ${masterRows} rows loaded.`, type: 'info' });
+  if (discrepancies > 0) consoleSeed.push({ message: `${discrepancies} discrepanc${discrepancies === 1 ? 'y' : 'ies'} pending resolution.`, type: 'warning' });
+  if (consoleSeed.length === 0) consoleSeed.push({ message: 'Dashboard loaded. No issues detected.', type: 'success' });
 
   return {
-    masterRows: getRowCount('Master Input'),
-    discrepancies: getRowCount('Discrepancy Tracker'),
-    additionalCosts: getRowCount('Additonal Costs'),
-    carriers: carriers,
-    sheetUrl: ss.getUrl()
+    masterRows,
+    tmstRows,
+    discrepancies,
+    additionalCosts: addlCosts,
+    carriers,
+    summary: {
+      readinessScore: score,
+      discrepancyRate: discRate,
+      configReadyCount,
+      configuredCarrierCount,
+      primaryCarrierCount: primaryRdcs.length,
+      linkedHaulierCount
+    },
+    alerts,
+    operationsSheets,
+    configSheets,
+    viewerSheets,
+    consoleSeed,
+    workbook: { name: ss.getName(), openUrl: ss.getUrl() }
   };
 }
 
@@ -1662,4 +1784,61 @@ function runProcessorWeb() {
 
 function clearTrackerWeb() {
   return clearTrackerData(true);
+}
+
+function setupConfigWeb() {
+  try {
+    setupConfigTab();
+    return { success: true, message: 'Configuration tabs initialized successfully.' };
+  } catch (e) {
+    return { success: false, message: 'Initialization error: ' + e.message };
+  }
+}
+
+// --- LIVE CONFIG READ/WRITE (used by the web UI editor) ---
+
+function getConfigData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const readRows = (name) => {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return null;
+    const data = sheet.getDataRange().getValues();
+    return data.slice(1); // exclude header row
+  };
+  const readAll = (name) => {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return null;
+    return sheet.getDataRange().getValues(); // include header (used for Email Template)
+  };
+  return {
+    systemConfig:  readRows('System Config'),
+    glConfig:      readRows('GL Config'),
+    rdcAliases:    readRows('RDC Aliases'),
+    emailTemplate: readAll('Email Template'),
+    headerConfig:  readRows('Header Config')
+  };
+}
+
+function saveConfigData(sheetName, rows) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      return { success: false, message: `Sheet "${sheetName}" not found. Run Initialization first.` };
+    }
+    // Clear existing data rows (preserve header row 1)
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+    }
+    // Write new data rows
+    if (rows && rows.length > 0) {
+      const cols = rows[0].length;
+      sheet.getRange(2, 1, rows.length, cols).setValues(rows);
+    }
+    return { success: true, message: `"${sheetName}" saved (${rows ? rows.length : 0} rows).` };
+  } catch (e) {
+    return { success: false, message: 'Save failed: ' + e.message };
+  }
 }
