@@ -1139,10 +1139,19 @@ function cfgTableRow(cols) {
   return '<tr>' + cfgRowHtml(cols) + '</tr>';
 }
 
+// Escape for HTML attribute values: use esc() for &, <, >
+// and additionally escape double and single quotes.
+function escAttr(str) {
+  var s = esc(str);
+  s = s.replace(/"/g, '&quot;');
+  s = s.replace(/'/g, '&#39;');
+  return s;
+}
+
 function cfgRowHtml(cols) {
   var html = '';
   cols.forEach(function(col, ci) {
-    html += '<td><input class="cfg-input' + (col.cls ? ' ' + col.cls : '') + '" data-col="' + ci + '" value="' + esc(col.val || '') + '"></td>';
+    html += '<td><input class="cfg-input' + (col.cls ? ' ' + col.cls : '') + '" data-col="' + ci + '" value="' + escAttr(col.val || '') + '"></td>';
   });
   html += '<td><button class="cfg-del-btn" onclick="delCfgRow(this)" title="Delete row"><i class="fa-solid fa-xmark"></i></button></td>';
   return html;
