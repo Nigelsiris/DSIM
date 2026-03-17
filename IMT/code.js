@@ -1,3 +1,4 @@
+ /**
  * INVOICE MASTER TRACKER AUTOMATION
  * * Features:
  * - Auto-creates custom menu, system config, GL config, RDC aliases, Email template, and Header config tabs.

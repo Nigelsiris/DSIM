@@ -1192,10 +1192,10 @@ function saveHeaderConfig() {
 }
 
 // ── AUTO-LOAD CONFIG WHEN NAVIGATING TO CONFIG VIEW ──
+var _configLoaded = false;
 document.querySelector('[data-view="config"]').addEventListener('click', function() {
   if (!_configLoaded) { _configLoaded = true; loadConfigData(); }
 });
-var _configLoaded = false;
 
 // ── BOOT ───────────────────────────────────────────────
 window.onload = function() {
