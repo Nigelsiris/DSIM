@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IMT – Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <style>
+    :root {
+      --imt-accent: #3b82f6;
+      --imt-accent-light: #dbeafe;
+      --imt-success: #16a34a;
+      --imt-warning: #ca8a04;
+      --imt-danger:  #dc2626;
+      --imt-muted:   #6b7280;
+    }
+
+    body { background: var(--background-color); }
+
+    /* ── Top nav ───────────────────────────────────── */
+    .imt-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.5rem;
+      background: var(--card-background-color);
+      border-bottom: 1px solid var(--muted-border-color);
+      gap: 1rem;
+    }
+    .imt-nav-brand {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--imt-accent);
+      text-decoration: none;
+    }
+    .imt-nav-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .imt-nav-links a {
+      padding: 0.35rem 0.85rem;
+      border-radius: 0.375rem;
+      font-size: 0.9rem;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.15s;
+    }
+    .imt-nav-links a:hover  { background: var(--primary-focus); }
+    .imt-nav-links a.active { background: var(--imt-accent); color: #fff; }
+
+    /* ── Page layout ───────────────────────────────── */
+    .imt-main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+
+    /* ── Metric cards ──────────────────────────────── */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .metric-card {
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .metric-card .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--imt-accent);
+    }
+    .metric-card .metric-label {
+      font-size: 0.8rem;
+      color: var(--imt-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* ── Section headings ──────────────────────────── */
+    .section-heading {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid var(--imt-accent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── Invoice table ─────────────────────────────── */
+    .invoice-table-wrap { overflow-x: auto; }
+    .invoice-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .invoice-table th,
+    .invoice-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--muted-border-color); text-align: left; }
+    .invoice-table th { background: var(--card-background-color); font-weight: 600; white-space: nowrap; }
+    .invoice-table tr:hover td { background: var(--primary-focus); }
+
+    /* ── Status badge ──────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-draft    { background: #e5e7eb; color: #374151; }
+    .badge-sent     { background: #dbeafe; color: #1d4ed8; }
+    .badge-paid     { background: #dcfce7; color: #15803d; }
+    .badge-overdue  { background: #fee2e2; color: #b91c1c; }
+    .badge-void     { background: #f3f4f6; color: #9ca3af; }
+
+    /* ── Carrier breakdown table ───────────────────── */
+    .carrier-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .carrier-table th,
+    .carrier-table td { padding: 0.45rem 0.65rem; border-bottom: 1px solid var(--muted-border-color); }
+    .carrier-table th { font-weight: 600; background: var(--card-background-color); }
+
+    /* ── Loading / empty state ─────────────────────── */
+    .loading-state, .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--imt-muted);
+    }
+
+    /* ── Responsive two-column lower section ────────── */
+    .lower-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 768px) { .lower-grid { grid-template-columns: 1fr; } }
+
+    /* ── Setup banner ──────────────────────────────── */
+    .setup-banner {
+      background: var(--imt-accent-light);
+      border: 1px solid var(--imt-accent);
+      border-radius: 0.5rem;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    /* ── Spinner ───────────────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 1.2em; height: 1.2em;
+      border: 3px solid var(--muted-border-color);
+      border-top-color: var(--imt-accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5em;
+    }
+
+    /* ── Action buttons in table ───────────────────── */
+    .btn-sm {
+      padding: 0.2rem 0.6rem;
+      font-size: 0.78rem;
+      border-radius: 0.3rem;
+      cursor: pointer;
+      border: 1px solid var(--muted-border-color);
+      background: var(--card-background-color);
+      color: inherit;
+      text-decoration: none;
+    }
+    .btn-sm:hover { background: var(--primary-focus); }
+    .btn-sm-primary { background: var(--imt-accent); color: #fff; border-color: var(--imt-accent); }
+    .btn-sm-primary:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <!-- ── Navigation ── -->
+  <nav class="imt-nav">
+    <span class="imt-nav-brand">📦 IMT</span>
+    <div class="imt-nav-links">
+      <a href="?page=dashboard" class="active">Dashboard</a>
+      <a href="?page=config">Configuration</a>
+    </div>
+  </nav>
+
+  <main class="imt-main">
+    <!-- Setup banner (shown when sheets aren't initialised) -->
+    <div class="setup-banner" id="setupBanner" style="display:none">
+      <span>⚙️ Config sheets have not been initialised yet.</span>
+      <button class="btn-sm btn-sm-primary" onclick="runSetup()">Initialise Sheets</button>
+    </div>
+
+    <!-- ── Metric summary ── -->
+    <div class="metric-grid" id="metricGrid">
+      <div class="metric-card"><div class="metric-value"><span class="spinner"></span></div><div class="metric-label">Loading…</div></div>
+    </div>
+
+    <!-- ── Recent invoices ── -->
+    <div>
+      <div class="section-heading">
+        <span>Recent Invoices</span>
+        <button class="btn-sm btn-sm-primary" onclick="loadInvoices()">↻ Refresh</button>
+      </div>
+      <div class="invoice-table-wrap">
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>Invoice ID</th>
+              <th>Date</th>
+              <th>Period</th>
+              <th>Carrier</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoiceBody">
+            <tr><td colspan="7" class="loading-state"><span class="spinner"></span> Loading invoices…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Lower grid: by-status + by-carrier ── -->
+    <div class="lower-grid">
+      <!-- By-status breakdown -->
+      <div>
+        <div class="section-heading">Invoices by Status</div>
+        <div id="statusBreakdown" class="loading-state"><span class="spinner"></span></div>
+      </div>
+
+      <!-- By-carrier breakdown -->
+      <div>
+        <div class="section-heading">Invoices by Carrier</div>
+        <div id="carrierBreakdown" class="loading-state"><span class="spinner"></span></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ── Currency formatter ─────────────────────────────────────
+    function fmtCurrency(val, symbol) {
+      symbol = symbol || '£';
+      const n = parseFloat(String(val).replace(/[^0-9.-]/g, '')) || 0;
+      return symbol + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    // ── Status badge HTML ──────────────────────────────────────
+    function statusBadge(status) {
+      const map = {
+        draft:   'badge-draft',
+        sent:    'badge-sent',
+        paid:    'badge-paid',
+        overdue: 'badge-overdue',
+        void:    'badge-void'
+      };
+      const cls = map[(status || '').toLowerCase()] || 'badge-draft';
+      return '<span class="badge ' + cls + '">' + escHtml(status || 'Draft') + '</span>';
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Load summary metrics ───────────────────────────────────
+    function loadSummary() {
+      google.script.run
+        .withSuccessHandler(renderSummary)
+        .withFailureHandler(function(e) {
+          document.getElementById('metricGrid').innerHTML =
+            '<p style="color:var(--imt-danger)">Failed to load metrics: ' + escHtml(e.message) + '</p>';
+        })
+        .getInvoiceSummary();
+    }
+
+    function renderSummary(s) {
+      const currency = '£';
+      const grid = document.getElementById('metricGrid');
+      grid.innerHTML = [
+        metricCard(s.total,                           'Total Invoices'),
+        metricCard(fmtCurrency(s.totalAmount, currency), 'Total Value'),
+        metricCard(s.byStatus['Paid'] || 0,           'Paid'),
+        metricCard(s.byStatus['Sent'] || 0,           'Awaiting Payment'),
+        metricCard(s.byStatus['Draft'] || 0,          'Drafts'),
+        metricCard(s.byStatus['Overdue'] || 0,        'Overdue')
+      ].join('');
+
+      renderStatusBreakdown(s.byStatus);
+      renderCarrierBreakdown(s.byCarrier);
+    }
+
+    function metricCard(value, label) {
+      return '<div class="metric-card">'
+        + '<div class="metric-value">' + escHtml(String(value)) + '</div>'
+        + '<div class="metric-label">' + escHtml(label) + '</div>'
+        + '</div>';
+    }
+
+    // ── Load full invoice list ─────────────────────────────────
+    function loadInvoices() {
+      document.getElementById('invoiceBody').innerHTML =
+        '<tr><td colspan="7" class="loading-state"><span class="spinner"></span> Loading…</td></tr>';
+      google.script.run
+        .withSuccessHandler(renderInvoices)
+        .withFailureHandler(function(e) {
+          document.getElementById('invoiceBody').innerHTML =
+            '<tr><td colspan="7" style="color:var(--imt-danger);padding:1rem">Error: ' + escHtml(e.message) + '</td></tr>';
+        })
+        .getAllInvoices();
+    }
+
+    function renderInvoices(invoices) {
+      const tbody = document.getElementById('invoiceBody');
+      if (!invoices || invoices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No invoices recorded yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = invoices.map(function(inv) {
+        const openBtn = inv.fileUrl
+          ? '<a href="' + escHtml(inv.fileUrl) + '" target="_blank" class="btn-sm btn-sm-primary">Open ↗</a> '
+          : '';
+        return '<tr>'
+          + '<td>' + escHtml(inv.id) + '</td>'
+          + '<td>' + escHtml(inv.date) + '</td>'
+          + '<td>' + escHtml(inv.period) + '</td>'
+          + '<td>' + escHtml(inv.carrier) + '</td>'
+          + '<td>' + escHtml(inv.amount) + '</td>'
+          + '<td>' + statusBadge(inv.status) + '</td>'
+          + '<td>' + openBtn
+          + '<select class="btn-sm" data-invoice-id="' + escHtml(inv.id) + '" onchange="changeStatus(this.dataset.invoiceId,this.value)" style="padding:0.15rem 0.4rem;font-size:0.78rem">'
+          + ['Draft','Sent','Paid','Overdue','Void'].map(function(st) {
+              return '<option value="' + st + '"'
+                + (inv.status === st ? ' selected' : '')
+                + '>' + st + '</option>';
+            }).join('')
+          + '</select>'
+          + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+
+    // ── Change invoice status ──────────────────────────────────
+    function changeStatus(id, newStatus) {
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (r && r.success) loadInvoices();
+        })
+        .withFailureHandler(function(e) { alert('Error: ' + e.message); })
+        .updateInvoiceStatus(id, newStatus);
+    }
+
+    // ── Status breakdown ───────────────────────────────────────
+    function renderStatusBreakdown(byStatus) {
+      const el = document.getElementById('statusBreakdown');
+      const entries = Object.entries(byStatus || {});
+      if (!entries.length) {
+        el.innerHTML = '<p class="empty-state">No data.</p>';
+        return;
+      }
+      el.innerHTML = '<table class="carrier-table"><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>'
+        + entries.map(function(kv) {
+            return '<tr><td>' + statusBadge(kv[0]) + '</td><td>' + escHtml(String(kv[1])) + '</td></tr>';
+          }).join('')
+        + '</tbody></table>';
+    }
+
+    // ── Carrier breakdown ──────────────────────────────────────
+    function renderCarrierBreakdown(byCarrier) {
+      const el = document.getElementById('carrierBreakdown');
+      const entries = Object.entries(byCarrier || {});
+      if (!entries.length) {
+        el.innerHTML = '<p class="empty-state">No data.</p>';
+        return;
+      }
+      el.innerHTML = '<table class="carrier-table"><thead><tr><th>Carrier</th><th>Invoices</th><th>Total</th></tr></thead><tbody>'
+        + entries
+            .sort(function(a, b) { return b[1].total - a[1].total; })
+            .map(function(kv) {
+              return '<tr><td>' + escHtml(kv[0]) + '</td>'
+                + '<td>' + escHtml(String(kv[1].count)) + '</td>'
+                + '<td>' + fmtCurrency(kv[1].total) + '</td></tr>';
+            }).join('')
+        + '</tbody></table>';
+    }
+
+    // ── One-time sheet setup ───────────────────────────────────
+    function runSetup() {
+      google.script.run
+        .withSuccessHandler(function(r) {
+          alert(r.message || 'Done.');
+          document.getElementById('setupBanner').style.display = 'none';
+          loadAll();
+        })
+        .withFailureHandler(function(e) { alert('Setup failed: ' + e.message); })
+        .setupConfigSheet();
+    }
+
+    // ── Bootstrap ─────────────────────────────────────────────
+    function loadAll() {
+      loadSummary();
+      loadInvoices();
+    }
+
+    // Show setup banner if summary returns empty (sheets not set up)
+    google.script.run
+      .withSuccessHandler(function(s) {
+        if (s.total === 0 && Object.keys(s.byStatus).length === 0) {
+          document.getElementById('setupBanner').style.display = 'flex';
+        }
+        renderSummary(s);
+      })
+      .withFailureHandler(function() {
+        document.getElementById('setupBanner').style.display = 'flex';
+        document.getElementById('metricGrid').innerHTML =
+          '<p style="color:var(--imt-muted);padding:1rem">Could not load summary. Click "Initialise Sheets" above to get started.</p>';
+      })
+      .getInvoiceSummary();
+
+    loadInvoices();
+  </script>
+</body>
+</html>
