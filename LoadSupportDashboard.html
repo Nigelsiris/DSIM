@@ -564,7 +564,7 @@
                 if (countEl) countEl.textContent = filteredEpjs.length;
 
                 if (filteredEpjs.length === 0) {
-                    var emptyMessage = allEpjStatuses.length === 0 
+                    var emptyMessage = epjStatuses.length === 0 
                         ? '<div class="empty-state"><div class="empty-state-icon">🛠️</div><h4>No EPJs in System</h4><p>No EPJs have been configured yet. Add EPJs to the EPJ Status sheet in your spreadsheet.</p></div>'
                         : '<div class="empty-state"><div class="empty-state-icon">🔍</div><h4>No Matching EPJs</h4><p>Try adjusting your search or filters to find what you\'re looking for.</p></div>';
                     tableBody.innerHTML = '<tr><td colspan="6">' + emptyMessage + '</td></tr>';

@@ -23,43 +23,71 @@
             <p id="feedback" style="text-align:center; min-height:20px;"></p>
         </article>
         
-        <button class="secondary outline" onclick="(function() { const token = localStorage.getItem('sessionToken'); google.script.run.withSuccessHandler(loadView).getUserView(token); })()" style="margin-top: 1rem;">Back to Main Screen</button>
+        <button class="secondary outline back-btn" style="margin-top: 1rem;">Back to Main Screen</button>
 
     </main>
     <script>
-        document.getElementById('changePasswordButton').addEventListener('click', () => {
-            const currentPass = document.getElementById('currentPassword').value;
-            const newPass = document.getElementById('newPassword').value;
-            const confirmPass = document.getElementById('confirmPassword').value;
-            const feedback = document.getElementById('feedback');
-
-            if (!currentPass || !newPass || !confirmPass) {
-                feedback.innerText = 'All fields are required.';
-                return;
+        (function() {
+            // Get token: prefer template-injected value, then fall back to parent scope / localStorage
+            var _token = (typeof token !== 'undefined' && token) ? token : null;
+            if (!_token && typeof sessionToken !== 'undefined' && sessionToken) {
+                _token = sessionToken;
             }
-            if (newPass !== confirmPass) {
-                feedback.innerText = 'New passwords do not match.';
-                return;
+            if (!_token) {
+                _token = localStorage.getItem('sessionToken');
             }
 
-            feedback.innerText = 'Updating password...';
-            const token = localStorage.getItem('sessionToken');
-            google.script.run
-                .withSuccessHandler(message => {
-                    feedback.innerText = message;
-                    // Clear fields on success
-                    if (message.includes('successfully')) {
-                        document.getElementById('currentPassword').value = '';
-                        document.getElementById('newPassword').value = '';
-                        document.getElementById('confirmPassword').value = '';
-                    }
-                })
-                .driverChangePassword({
-                    token: token,
-                    currentPassword: currentPass,
-                    newPassword: newPass
-                });
-        });
+            document.getElementById('changePasswordButton').addEventListener('click', function() {
+                var currentPass = document.getElementById('currentPassword').value;
+                var newPass = document.getElementById('newPassword').value;
+                var confirmPass = document.getElementById('confirmPassword').value;
+                var feedback = document.getElementById('feedback');
+
+                if (!currentPass || !newPass || !confirmPass) {
+                    feedback.innerText = 'All fields are required.';
+                    return;
+                }
+                if (newPass !== confirmPass) {
+                    feedback.innerText = 'New passwords do not match.';
+                    return;
+                }
+
+                feedback.innerText = 'Updating password...';
+                google.script.run
+                    .withSuccessHandler(function(message) {
+                        feedback.innerText = message;
+                        // Clear fields on success
+                        if (message && message.includes('successfully')) {
+                            document.getElementById('currentPassword').value = '';
+                            document.getElementById('newPassword').value = '';
+                            document.getElementById('confirmPassword').value = '';
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        feedback.innerText = 'Error: ' + (error.message || 'Unknown error');
+                    })
+                    .driverChangePassword({
+                        token: _token,
+                        currentPassword: currentPass,
+                        newPassword: newPass
+                    });
+            });
+
+            // Back button: use proper token (works for Drivers who don't have localStorage token)
+            document.querySelector('.back-btn').addEventListener('click', function() {
+                if (_token) {
+                    google.script.run.withSuccessHandler(function(html) {
+                        if (typeof loadView === 'function') {
+                            loadView(html);
+                        } else if (typeof goBackToUserView === 'function') {
+                            goBackToUserView();
+                        }
+                    }).getUserView(_token);
+                } else if (typeof goBackToUserView === 'function') {
+                    goBackToUserView();
+                }
+            });
+        })();
     </script>
 </body>
 </html>

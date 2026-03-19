@@ -19,8 +19,25 @@
       let preselectedEpj = null;
       // NEW: A variable to hold the admin dashboard's auto-refresh timer.
       let dashboardRefreshTimer = null;
+      // Configurable inactivity timeout (minutes), loaded from server on startup.
+      let INACTIVITY_TIMEOUT_MIN = 2;
 
       window.addEventListener('load', function() {
+        // Load public settings (system title, inactivity timeout) without auth
+        google.script.run
+          .withSuccessHandler(function(settings) {
+            if (settings) {
+              if (settings.systemTitle) {
+                document.title = settings.systemTitle;
+              }
+              if (settings.inactivityTimeoutMin) {
+                INACTIVITY_TIMEOUT_MIN = settings.inactivityTimeoutMin;
+              }
+            }
+          })
+          .withFailureHandler(function() { /* ignore – use defaults */ })
+          .getPublicSettings();
+
         const persistentToken = localStorage.getItem('sessionToken');
         if (persistentToken) {
           sessionToken = persistentToken;
